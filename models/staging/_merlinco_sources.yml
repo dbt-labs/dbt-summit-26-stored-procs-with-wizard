@@ -123,7 +123,7 @@ sources:
             description: Recipe unit.
       - name: RAW_ORDERS
         identifier: RAW_ORDERS
-        description: Raw order headers.
+        description: Raw order headers, one row per order.
         columns:
           - name: ORDER_ID
             description: Primary order identifier.

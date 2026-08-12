@@ -1,0 +1,128 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: Cleaned order headers, one row per non-null order identifier.
+    columns:
+      - name: order_id
+        description: Primary order identifier.
+        data_tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: Customer who placed the order.
+        data_tests:
+          - not_null
+      - name: shop_id
+        description: Shop that received the order.
+        data_tests:
+          - not_null
+      - name: ordered_at
+        description: Timestamp when the order was placed.
+      - name: order_status
+        description: Normalized order status.
+      - name: order_channel
+        description: Normalized order channel.
+      - name: discount_copper
+        description: Order discount in copper coins, defaulting to zero.
+      - name: discount_gold
+        description: Order discount converted to gold units.
+
+  - name: stg_order_items
+    description: Cleaned order line items, one row per order item.
+    columns:
+      - name: order_item_id
+        description: Primary order-item identifier.
+        data_tests:
+          - unique
+          - not_null
+      - name: order_id
+        description: Identifier of the associated order.
+        data_tests:
+          - not_null
+      - name: potion_sku
+        description: SKU of the ordered potion.
+      - name: quantity
+        description: Ordered quantity, defaulting to zero when unparseable.
+      - name: unit_price_copper
+        description: Unit price in copper coins, defaulting to zero when unparseable.
+
+  - name: stg_payments
+    description: Cleaned payment attempts, one row per payment identifier.
+    columns:
+      - name: payment_id
+        description: Primary payment identifier.
+        data_tests:
+          - unique
+          - not_null
+      - name: order_id
+        description: Identifier of the order being paid.
+        data_tests:
+          - not_null
+      - name: payment_method
+        description: Normalized payment method.
+      - name: amount_copper
+        description: Payment amount in copper coins, defaulting to zero when unparseable.
+      - name: payment_status
+        description: Normalized payment status.
+      - name: paid_at
+        description: Timestamp when the payment attempt was recorded.
+
+  - name: stg_customers
+    description: Cleaned customer records, one row per customer.
+    columns:
+      - name: customer_id
+        description: Primary customer identifier.
+        data_tests:
+          - unique
+          - not_null
+      - name: full_name
+        description: Customer display name.
+      - name: email
+        description: Lowercased and trimmed customer email address.
+      - name: home_region
+        description: Standardized customer home region.
+      - name: signed_up_at
+        description: Date the customer signed up.
+      - name: birth_year
+        description: Customer birth year.
+      - name: favored_discipline
+        description: Title-cased favored magical discipline.
+
+  - name: stg_guild_memberships
+    description: Cleaned customer guild membership history, one row per membership.
+    columns:
+      - name: membership_id
+        description: Primary membership identifier retained for deterministic current-record selection.
+        data_tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: Identifier of the member customer.
+        data_tests:
+          - not_null
+      - name: guild_id
+        description: Identifier of the associated guild.
+      - name: guild_tier
+        description: Normalized membership tier.
+      - name: valid_from
+        description: Date the membership became valid.
+      - name: valid_to
+        description: Date the membership ended; null represents an open-ended membership.
+
+  - name: stg_shops
+    description: Cleaned shop locations, one row per shop.
+    columns:
+      - name: shop_id
+        description: Primary shop identifier.
+        data_tests:
+          - unique
+          - not_null
+      - name: shop_name
+        description: Shop name.
+      - name: city
+        description: City where the shop is located.
+      - name: shop_region
+        description: Title-cased shop region.
+      - name: opened_at
+        description: Date the shop opened.

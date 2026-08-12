@@ -1,0 +1,75 @@
+version: 2
+
+models:
+  - name: int_order_item_rollup
+    description: Order-item aggregates for profitability reporting, one row per order.
+    columns:
+      - name: order_id
+        description: Identifier of the order represented by the aggregate.
+        data_tests:
+          - unique
+          - not_null
+      - name: item_quantity
+        description: Total item quantity across all order lines.
+      - name: gross_revenue_copper
+        description: Total line revenue in copper coins before discounts.
+      - name: gross_revenue_gold
+        description: Total line revenue in gold units before discounts.
+      - name: line_count
+        description: Number of order lines.
+      - name: distinct_potions
+        description: Count of distinct potion SKUs in the order.
+
+
+  - name: int_payments_rollup
+    description: Payment-attempt aggregates for profitability reporting, one row per order.
+    columns:
+      - name: order_id
+        description: Identifier of the order represented by the aggregate.
+        data_tests:
+          - unique
+          - not_null
+      - name: paid_amount_copper
+        description: Total successful payment amount in copper coins.
+      - name: paid_amount_gold
+        description: Total successful payment amount in gold units.
+      - name: latest_paid_at
+        description: Latest parsed timestamp across all payment attempts for the order.
+      - name: has_successful_payment
+        description: One when the order has at least one successful payment attempt, otherwise zero.
+      - name: payment_attempt_count
+        description: Count of all payment attempts for the order.
+
+
+  - name: int_memberships_current
+    description: Current customer guild membership selected by the legacy deterministic tie-break rule, one row per customer.
+    columns:
+      - name: customer_id
+        description: Identifier of the customer represented by the selected membership.
+        data_tests:
+          - unique
+          - not_null
+      - name: guild_id
+        description: Identifier of the selected current guild.
+      - name: guild_tier
+        description: Normalized tier of the selected current membership.
+      - name: valid_from
+        description: Date the selected membership became valid.
+      - name: valid_to
+        description: Date the selected membership ended; null represents an open-ended membership.
+
+unit_tests:
+  - name: int_memberships_current_uses_open_ended_and_membership_id_tie_breakers
+    description: Open-ended memberships win, then the highest membership identifier resolves equal-date ties.
+    model: int_memberships_current
+    given:
+      - input: ref('stg_guild_memberships')
+        rows:
+          - {membership_id: 101, customer_id: CUST_OPEN, guild_id: GUILD_OLD, guild_tier: apprentice, valid_from: '2024-01-01', valid_to: '2024-12-31'}
+          - {membership_id: 102, customer_id: CUST_OPEN, guild_id: GUILD_CURRENT, guild_tier: master, valid_from: '2024-02-01', valid_to: null}
+          - {membership_id: 201, customer_id: CUST_TIE, guild_id: GUILD_LOW, guild_tier: novice, valid_from: '2024-01-01', valid_to: '2024-12-31'}
+          - {membership_id: 202, customer_id: CUST_TIE, guild_id: GUILD_HIGH, guild_tier: expert, valid_from: '2024-01-01', valid_to: '2024-12-31'}
+    expect:
+      rows:
+        - {customer_id: CUST_OPEN, guild_id: GUILD_CURRENT, guild_tier: master, valid_from: '2024-02-01', valid_to: null}
+        - {customer_id: CUST_TIE, guild_id: GUILD_HIGH, guild_tier: expert, valid_from: '2024-01-01', valid_to: '2024-12-31'}

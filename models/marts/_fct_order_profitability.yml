@@ -1,0 +1,87 @@
+version: 2
+
+models:
+  - name: fct_order_profitability
+    description: Order profitability fact table, one row per order, preserving legacy current-membership and null-rollup behavior.
+    columns:
+      - name: order_id
+        description: Primary order identifier.
+        data_tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: Customer who placed the order.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+      - name: shop_id
+        description: Shop that received the order.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_shops')
+                field: shop_id
+      - name: customer_name
+        description: Customer display name from the customer staging model.
+      - name: customer_email
+        description: Normalized customer email address.
+      - name: home_region
+        description: Standardized customer home region.
+      - name: favored_discipline
+        description: Customer's normalized favored magical discipline.
+      - name: guild_id
+        description: Current guild identifier under the legacy current-membership rule.
+      - name: guild_tier
+        description: Current guild tier under the legacy current-membership rule.
+      - name: shop_name
+        description: Shop name.
+      - name: shop_city
+        description: City where the shop is located.
+      - name: shop_region
+        description: Standardized shop region.
+      - name: ordered_at
+        description: Timestamp when the order was placed.
+      - name: ordered_date
+        description: Calendar date on which the order was placed.
+      - name: order_status
+        description: Normalized order status.
+      - name: order_channel
+        description: Normalized order channel.
+      - name: item_quantity
+        description: Total item quantity; null when the order has no item rollup, matching legacy behavior.
+      - name: line_count
+        description: Order-line count; null when the order has no item rollup, matching legacy behavior.
+      - name: distinct_potions
+        description: Number of distinct potion SKUs; null when the order has no item rollup, matching legacy behavior.
+      - name: gross_revenue_copper
+        description: Gross item revenue in copper coins before discounts.
+      - name: gross_revenue_gold
+        description: Gross item revenue in gold units before discounts.
+      - name: discount_copper
+        description: Order discount in copper coins.
+      - name: discount_gold
+        description: Order discount in gold units.
+      - name: net_revenue_copper
+        description: Gross revenue less discount in copper coins.
+      - name: net_revenue_gold
+        description: Gross revenue less discount in gold units.
+      - name: paid_amount_copper
+        description: Total successful payment amount in copper coins; null when the order has no payment rollup.
+      - name: paid_amount_gold
+        description: Total successful payment amount in gold units; null when the order has no payment rollup.
+      - name: latest_paid_at
+        description: Latest payment-attempt timestamp; null when the order has no payment rollup.
+      - name: payment_attempt_count
+        description: Count of payment attempts; null when the order has no payment rollup.
+      - name: payment_state
+        description: Paid when any payment succeeds, otherwise cancelled for cancelled orders, otherwise unpaid.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['paid', 'cancelled', 'unpaid']
+      - name: is_home_region_order
+        description: Whether the customer's home region matches the shop region.
+      - name: loaded_at
+        description: Timestamp when dbt built this fact table; it is execution-time metadata and not parity-comparable to historical procedure runs.
