@@ -1,0 +1,11 @@
+version: 2
+
+models:
+  - name: time_spine_daily
+    description: Daily calendar spine for MetricFlow time-based metric queries, spanning five years of history through 30 days ahead.
+    time_spine:
+      standard_granularity_column: date_day
+    columns:
+      - name: date_day
+        description: Calendar date at daily grain.
+        granularity: day

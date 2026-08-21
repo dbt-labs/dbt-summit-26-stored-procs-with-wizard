@@ -2,15 +2,67 @@ version: 2
 
 models:
   - name: fct_order_profitability
-    description: Order profitability fact table, one row per order, preserving legacy current-membership and null-rollup behavior.
+    description: Order profitability fact table at one row per order, preserving legacy current-membership and null-rollup behavior. Revenue metrics exclude the execution-time `loaded_at` metadata column.
+    semantic_model:
+      enabled: true
+    agg_time_dimension: ordered_date
+    metrics:
+      - name: order_count
+        description: Count of orders at the fact's one-row-per-order grain.
+        type: simple
+        label: Order Count
+        agg: count
+        expr: 1
+      - name: gross_revenue_gold
+        description: Sum of pre-discount item revenue in gold units across orders with item rollups.
+        type: simple
+        label: Gross Revenue Gold
+        agg: sum
+        expr: gross_revenue_gold
+      - name: discount_gold
+        description: Sum of order discounts in gold units.
+        type: simple
+        label: Discount Gold
+        agg: sum
+        expr: discount_gold
+      - name: net_revenue_gold
+        description: Sum of gross item revenue less order discounts in gold units across orders with item rollups.
+        type: simple
+        label: Net Revenue Gold
+        agg: sum
+        expr: net_revenue_gold
+      - name: paid_amount_gold
+        description: Sum of successful payment amounts in gold units; orders without payment rollups contribute null.
+        type: simple
+        label: Paid Amount Gold
+        agg: sum
+        expr: paid_amount_gold
+      - name: item_quantity
+        description: Sum of item quantities across orders with item rollups.
+        type: simple
+        label: Item Quantity
+        agg: sum
+        expr: item_quantity
+      - name: distinct_potions
+        description: Sum of each order's distinct potion-SKU count; this is not a distinct count across the reporting set.
+        type: simple
+        label: Distinct Potions
+        agg: sum
+        expr: distinct_potions
     columns:
       - name: order_id
         description: Primary order identifier.
+        entity:
+          type: primary
+          name: orders
         data_tests:
           - unique
           - not_null
       - name: customer_id
         description: Customer who placed the order.
+        entity:
+          type: foreign
+          name: customer
         data_tests:
           - relationships:
               arguments:
@@ -18,6 +70,9 @@ models:
                 field: customer_id
       - name: shop_id
         description: Shop that received the order.
+        entity:
+          type: foreign
+          name: shop
         data_tests:
           - relationships:
               arguments:
@@ -29,26 +84,41 @@ models:
         description: Normalized customer email address.
       - name: home_region
         description: Standardized customer home region.
+        dimension:
+          type: categorical
       - name: favored_discipline
         description: Customer's normalized favored magical discipline.
+        dimension:
+          type: categorical
       - name: guild_id
         description: Current guild identifier under the legacy current-membership rule.
       - name: guild_tier
         description: Current guild tier under the legacy current-membership rule.
+        dimension:
+          type: categorical
       - name: shop_name
         description: Shop name.
       - name: shop_city
         description: City where the shop is located.
       - name: shop_region
         description: Standardized shop region.
+        dimension:
+          type: categorical
       - name: ordered_at
         description: Timestamp when the order was placed.
       - name: ordered_date
         description: Calendar date on which the order was placed.
+        granularity: day
+        dimension:
+          type: time
       - name: order_status
         description: Normalized order status.
+        dimension:
+          type: categorical
       - name: order_channel
         description: Normalized order channel.
+        dimension:
+          type: categorical
       - name: item_quantity
         description: Total item quantity; null when the order has no item rollup, matching legacy behavior.
       - name: line_count
@@ -77,6 +147,8 @@ models:
         description: Count of payment attempts; null when the order has no payment rollup.
       - name: payment_state
         description: Paid when any payment succeeds, otherwise cancelled for cancelled orders, otherwise unpaid.
+        dimension:
+          type: categorical
         data_tests:
           - accepted_values:
               arguments:
