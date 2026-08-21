@@ -1,4 +1,4 @@
-create or replace procedure analytics.util.sp_load_order_profitability()
+create or replace procedure ANALYTICS_WIZARD.DBT_SNGUYEN.sp_load_order_profitability()
 returns varchar
 language sql
 execute as caller
@@ -17,7 +17,7 @@ begin
         lower(trim(o.channel)) as order_channel,
         coalesce(try_to_number(o.discount_copper), 0) as discount_copper,
         coalesce(try_to_number(o.discount_copper), 0) / 100.0 as discount_gold
-    from raw_orders o
+    from RAW_WIZARD.MERLINCO_APOTHECARIES.raw_orders o
     where o.order_id is not null;
 
     create or replace temporary table tmp_order_item_rollup as
@@ -32,7 +32,7 @@ begin
         ) as gross_revenue_gold,
         count(*) as line_count,
         count(distinct oi.potion_sku) as distinct_potions
-    from raw_order_items oi
+    from RAW_WIZARD.MERLINCO_APOTHECARIES.raw_order_items oi
     group by 1;
 
     create or replace temporary table tmp_payments_rollup as
@@ -62,7 +62,7 @@ begin
                     try_to_date(gm.valid_from) desc,
                     gm.membership_id desc
             ) as rn
-        from raw_guild_memberships gm
+        from RAW_WIZARD.MERLINCO_APOTHECARIES.raw_guild_memberships gm
     ) deduped
     where rn = 1;
 
@@ -78,7 +78,7 @@ begin
         try_to_date(c.signed_up_at) as signed_up_at,
         try_to_number(c.birth_year) as birth_year,
         initcap(trim(c.favored_discipline)) as favored_discipline
-    from raw_customers c;
+    from RAW_WIZARD.MERLINCO_APOTHECARIES.raw_customers c;
 
     create or replace temporary table tmp_shop_clean as
     select
@@ -87,7 +87,7 @@ begin
         s.city,
         initcap(trim(s.region)) as shop_region,
         try_to_date(s.opened_at) as opened_at
-    from raw_shops s;
+    from RAW_WIZARD.MERLINCO_APOTHECARIES.raw_shops s;
 
     create or replace temporary table tmp_fct_order_profitability as
     select
@@ -142,9 +142,9 @@ begin
     left join tmp_shop_clean s
         on o.shop_id = s.shop_id;
 
-    delete from analytics.mart.fct_order_profitability;
+    delete from ANALYTICS_WIZARD.DBT_SNGUYEN.fct_order_profitability;
 
-    insert into analytics.mart.fct_order_profitability (
+    insert into ANALYTICS_WIZARD.DBT_SNGUYEN.fct_order_profitability (
         order_id,
         customer_id,
         customer_name,
@@ -216,6 +216,6 @@ begin
     select count(*) into :v_rows_inserted
     from tmp_fct_order_profitability;
 
-    return 'Loaded analytics.mart.fct_order_profitability with ' || v_rows_inserted || ' rows';
+    return 'Loaded ANALYTICS_WIZARD.DBT_SNGUYEN.fct_order_profitability with ' || v_rows_inserted || ' rows';
 end;
 $$;
