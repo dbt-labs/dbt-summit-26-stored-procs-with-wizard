@@ -1,0 +1,17 @@
+Example:
+Context: I'm migrating a legacy stored procedure into modular dbt models. The proc... I want to split those concerns into a small DAG with clear grain at each layer.
+
+Tables and relationships:
+- raw_orders — one row per order
+…
+Business rules and sample values:
+- amounts are stored in cents; report a dollars value = cents / 100.0
+…
+Please work in steps:
+1. Draft staging models that only clean and cast their own source at source grain — convert cents to dollars.
+2. Draft intermediate models: int_order_item_rollup and int_payments_rollup, each aggregated to one row per order_id.
+3. Draft fct_orders …
+
+Output for fct_orders:
+- order_id, customer_id, customer_name, …
+- item_quantity, gross_revenue, discount, net_revenue, paid_amount, payment_state
