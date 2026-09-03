@@ -1,0 +1,87 @@
+version: 2
+
+models:
+  - name: fct_order_profitability
+    description: Order profitability mart at one row per order_id, migrated from legacy_sp_load_order_profitability.
+    columns:
+      - name: order_id
+        description: Primary order identifier and mart grain.
+        data_tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: Customer that placed the order.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+      - name: customer_name
+        description: Customer display name at build time.
+      - name: customer_email
+        description: Normalized customer email at build time.
+      - name: home_region
+        description: Normalized customer home region.
+      - name: favored_discipline
+        description: Customer favored discipline.
+      - name: guild_id
+        description: Selected current guild for the customer.
+      - name: guild_tier
+        description: Selected current guild tier for the customer.
+      - name: shop_id
+        description: Shop that received the order.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_shops')
+                field: shop_id
+      - name: shop_name
+        description: Shop name at build time.
+      - name: shop_city
+        description: Shop city at build time.
+      - name: shop_region
+        description: Normalized shop region.
+      - name: ordered_at
+        description: Parsed order timestamp.
+      - name: ordered_date
+        description: Calendar date of the order.
+      - name: order_status
+        description: Normalized order status.
+      - name: order_channel
+        description: Normalized order channel.
+      - name: item_quantity
+        description: Total item quantity on the order.
+      - name: line_count
+        description: Number of order lines.
+      - name: distinct_potions
+        description: Number of distinct potion SKUs ordered.
+      - name: gross_revenue_copper
+        description: Gross order revenue in copper coins before discounts.
+      - name: gross_revenue_gold
+        description: Gross order revenue in gold coins before discounts.
+      - name: discount_copper
+        description: Order discount in copper coins.
+      - name: discount_gold
+        description: Order discount in gold coins.
+      - name: net_revenue_copper
+        description: Gross revenue less discount in copper coins.
+      - name: net_revenue_gold
+        description: Gross revenue less discount in gold coins.
+      - name: paid_amount_copper
+        description: Successful payment amount in copper coins.
+      - name: paid_amount_gold
+        description: Successful payment amount in gold coins.
+      - name: latest_paid_at
+        description: Latest timestamp across the order's payment attempts.
+      - name: payment_attempt_count
+        description: Number of payment attempts for the order.
+      - name: payment_state
+        description: Derived order payment state.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['paid', 'cancelled', 'unpaid']
+      - name: is_home_region_order
+        description: Whether the normalized customer and shop regions match.
+      - name: loaded_at
+        description: Timestamp when dbt rebuilt the mart table.

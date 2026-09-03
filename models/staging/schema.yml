@@ -1,0 +1,118 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: Cleaned order headers at one row per order_id.
+    columns:
+      - name: order_id
+        description: Primary order identifier.
+        data_tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: Customer that placed the order.
+      - name: shop_id
+        description: Shop that received the order.
+      - name: ordered_at
+        description: Parsed order timestamp.
+      - name: order_status
+        description: Lowercase order status.
+      - name: order_channel
+        description: Lowercase order channel.
+      - name: discount_copper
+        description: Order discount in copper coins, defaulting invalid values to zero.
+      - name: discount_gold
+        description: Order discount converted to gold coins.
+
+  - name: stg_order_items
+    description: Cleaned order lines at one row per order_item_id.
+    columns:
+      - name: order_item_id
+        description: Primary order line identifier.
+        data_tests:
+          - unique
+          - not_null
+      - name: order_id
+        description: Order containing the line item.
+      - name: potion_sku
+        description: Potion sold on the line item.
+      - name: quantity
+        description: Parsed item quantity, defaulting invalid values to zero.
+      - name: unit_price_copper
+        description: Parsed unit price in copper coins, defaulting invalid values to zero.
+
+  - name: stg_payments
+    description: Cleaned payment attempts at one row per payment_id.
+    columns:
+      - name: payment_id
+        description: Primary payment attempt identifier.
+        data_tests:
+          - unique
+          - not_null
+      - name: order_id
+        description: Order associated with the payment attempt.
+      - name: payment_method
+        description: Lowercase payment method.
+      - name: amount_copper
+        description: Parsed payment amount in copper coins, defaulting invalid values to zero.
+      - name: payment_status
+        description: Lowercase payment status.
+      - name: paid_at
+        description: Parsed payment attempt timestamp.
+
+  - name: stg_customers
+    description: Cleaned customer attributes at one row per customer_id.
+    columns:
+      - name: customer_id
+        description: Primary customer identifier.
+        data_tests:
+          - unique
+          - not_null
+      - name: full_name
+        description: Customer display name.
+      - name: email
+        description: Lowercase customer email.
+      - name: home_region
+        description: Normalized customer home region.
+      - name: signed_up_at
+        description: Parsed customer signup date.
+      - name: birth_year
+        description: Parsed customer birth year.
+      - name: favored_discipline
+        description: Customer favored discipline in title case.
+
+  - name: stg_guild_memberships
+    description: Cleaned guild membership history at one row per membership_id.
+    columns:
+      - name: membership_id
+        description: Primary guild membership identifier.
+        data_tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: Customer belonging to the guild.
+      - name: guild_id
+        description: Guild membership identifier.
+      - name: guild_tier
+        description: Lowercase membership tier.
+      - name: valid_from
+        description: Parsed membership start date.
+      - name: valid_to
+        description: Parsed membership end date; null indicates an open-ended interval.
+
+  - name: stg_shops
+    description: Cleaned shop attributes at one row per shop_id.
+    columns:
+      - name: shop_id
+        description: Primary shop identifier.
+        data_tests:
+          - unique
+          - not_null
+      - name: shop_name
+        description: Shop name.
+      - name: city
+        description: Shop city.
+      - name: shop_region
+        description: Shop region in title case.
+      - name: opened_at
+        description: Parsed shop opening date.

@@ -1,0 +1,57 @@
+version: 2
+
+models:
+  - name: int_order_item_rollup
+    description: Order item quantities and gross revenue aggregated to one row per order_id.
+    columns:
+      - name: order_id
+        description: Primary order identifier for the rollup.
+        data_tests:
+          - unique
+          - not_null
+      - name: item_quantity
+        description: Total quantity across all order lines.
+      - name: gross_revenue_copper
+        description: Gross order revenue in copper coins before discounts.
+      - name: gross_revenue_gold
+        description: Gross order revenue converted to gold coins before discounts.
+      - name: line_count
+        description: Number of order lines.
+      - name: distinct_potions
+        description: Number of distinct potion SKUs ordered.
+
+  - name: int_payments_rollup
+    description: Payment attempt outcomes aggregated to one row per order_id.
+    columns:
+      - name: order_id
+        description: Primary order identifier for the rollup.
+        data_tests:
+          - unique
+          - not_null
+      - name: paid_amount_copper
+        description: Successful payment amount in copper coins.
+      - name: paid_amount_gold
+        description: Successful payment amount converted to gold coins.
+      - name: latest_paid_at
+        description: Latest timestamp across all payment attempts for the order.
+      - name: has_successful_payment
+        description: Integer flag indicating whether any payment attempt succeeded.
+      - name: payment_attempt_count
+        description: Number of payment attempts for the order.
+
+  - name: int_memberships_current
+    description: Latest selected guild membership at one row per customer_id.
+    columns:
+      - name: customer_id
+        description: Primary customer identifier for the current membership.
+        data_tests:
+          - unique
+          - not_null
+      - name: guild_id
+        description: Selected current guild identifier.
+      - name: guild_tier
+        description: Selected current membership tier.
+      - name: valid_from
+        description: Start date of the selected membership record.
+      - name: valid_to
+        description: End date of the selected membership record.
