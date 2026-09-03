@@ -165,4 +165,7 @@ The workshop migration is complete when:
 - the dbt fact output has been compared to the legacy procedure with execution-time metadata such as `loaded_at` excluded; and
 - the legacy procedure can be retired through a reversible, monitored cutover plan.
 
+## Showing username in workshop 
+
+dbt show --inline "select current_user()" --limit 1
 
