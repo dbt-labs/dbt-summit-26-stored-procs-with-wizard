@@ -17,7 +17,7 @@ begin
         lower(trim(o.channel)) as order_channel,
         coalesce(try_to_number(o.discount_copper), 0) as discount_copper,
         coalesce(try_to_number(o.discount_copper), 0) / 100.0 as discount_gold
-    from RAW.SMARD.raw_orders o
+    from RAW.MERLINCO_APOTHECARIES.raw_orders o
     where o.order_id is not null;
 
     create or replace temporary table tmp_order_item_rollup as
@@ -32,7 +32,7 @@ begin
         ) as gross_revenue_gold,
         count(*) as line_count,
         count(distinct oi.potion_sku) as distinct_potions
-    from RAW.SMARD.raw_order_items oi
+    from RAW.MERLINCO_APOTHECARIES.raw_order_items oi
     group by 1;
 
     create or replace temporary table tmp_payments_rollup as
@@ -43,7 +43,7 @@ begin
         max(try_to_timestamp_ntz(p.paid_at)) as latest_paid_at,
         max(case when lower(trim(p.status)) = 'success' then 1 else 0 end) as has_successful_payment,
         count(*) as payment_attempt_count
-    from RAW.SMARD.raw_payments p
+    from RAW.MERLINCO_APOTHECARIES.raw_payments p
     group by 1;
 
     create or replace temporary table tmp_membership_current as
@@ -62,7 +62,7 @@ begin
                     try_to_date(gm.valid_from) desc,
                     gm.membership_id desc
             ) as rn
-        from RAW.SMARD.raw_guild_memberships gm
+        from RAW.MERLINCO_APOTHECARIES.raw_guild_memberships gm
     ) deduped
     where rn = 1;
 
@@ -78,7 +78,7 @@ begin
         try_to_date(c.signed_up_at) as signed_up_at,
         try_to_number(c.birth_year) as birth_year,
         initcap(trim(c.favored_discipline)) as favored_discipline
-    from RAW.SMARD.raw_customers c;
+    from RAW.MERLINCO_APOTHECARIES.raw_customers c;
 
     create or replace temporary table tmp_shop_clean as
     select
@@ -87,7 +87,7 @@ begin
         s.city,
         initcap(trim(s.region)) as shop_region,
         try_to_date(s.opened_at) as opened_at
-    from RAW.SMARD.raw_shops s;
+    from RAW.MERLINCO_APOTHECARIES.raw_shops s;
 
     create or replace temporary table tmp_fct_order_profitability as
     select
