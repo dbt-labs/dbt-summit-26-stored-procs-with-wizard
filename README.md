@@ -1,5 +1,9 @@
 # dbt Summit 2026: Migrating Stored Procedures with dbt Wizard
 
+## Showing username in workshop 
+
+dbt show --inline "select current_user()" --limit 1
+
 ## What this repository is
 
 This is a hands-on dbt workshop repository for migrating the Snowflake stored procedure `sp_load_order_profitability` into a tested, documented dbt DAG using dbt Wizard.
@@ -46,26 +50,13 @@ mart
 
 ## How to use this repository
 
-### Prerequisites
-
-- Access to a Snowflake target that can read the `RAW_WIZARD.MERLINCO_APOTHECARIES` raw schema.
-- A configured dbt profile named `default`.
-- dbt Fusion / dbt Platform with dbt Wizard enabled.
-- Permission to create relations in your development target schema.
-
 ### Workshop sequence
 
-1. Review `dbt_project.yml` for the configured project paths and profile. The project name is currently the starter value `my_new_project`; update it if your workshop environment requires a different package name.
-2. Read the legacy implementation in `analyses/legacy_sp_load_order_profitability.sql` and the design in `analyses/legacy_sp_load_order_profitability_migration_plan.md`.
-3. Follow the guided instructions during the workshop. If you are stuck, utilize the guided prompts in `analyses/dbt_order_profitability_workshop_cheatsheet.md`.
-4. Use `models/staging/_merlinco_sources.yml` as the documented entry point for the raw warehouse tables. These inputs are warehouse tables, so downstream models should use `source()`, not `ref()`.
-5. Build and test models incrementally as you add them, then validate the completed fact lineage:
+1. Read the legacy implementation in `analyses/legacy_sp_load_order_profitability.sql` and the design in `analyses/legacy_sp_load_order_profitability_migration_plan.md`.
+2. Follow the guided instructions during the workshop. If you are stuck, utilize the guided prompts in `analyses/dbt_order_profitability_workshop_cheatsheet.md`.
+3. Use `models/staging/_merlinco_sources.yml` as the documented entry point for the raw warehouse tables. These inputs are warehouse tables, so downstream models should use `source()`, not `ref()`.
+4. Build and test models incrementally as you add them, then validate the completed fact lineage:
 
-```bash
-dbt build --select +fct_order_profitability+
-```
-
-The starter `models/example/` models are included only as the default dbt scaffold. They intentionally contain a null key and their attached `not_null` test will fail until you remove, correct, or replace the example models.
 
 ### Workshop flow
 
@@ -165,7 +156,4 @@ The workshop migration is complete when:
 - the dbt fact output has been compared to the legacy procedure with execution-time metadata such as `loaded_at` excluded; and
 - the legacy procedure can be retired through a reversible, monitored cutover plan.
 
-## Showing username in workshop 
-
-dbt show --inline "select current_user()" --limit 1
 
