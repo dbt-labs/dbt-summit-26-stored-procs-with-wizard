@@ -1,0 +1,279 @@
+version: 2
+
+models:
+  - name: stg_merlinco__orders
+    description: Cleaned order headers at one row per order_id.
+    columns:
+      - name: order_id
+        description: Primary order identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Customer that placed the order.
+      - name: shop_id
+        description: Shop that fulfilled the order.
+      - name: ordered_at
+        description: Order timestamp cast to a timestamp without a timezone.
+      - name: order_status
+        description: Lowercased and trimmed order status.
+      - name: order_channel
+        description: Lowercased and trimmed order channel.
+      - name: discount
+        description: Order discount converted from cents to dollars.
+
+  - name: stg_merlinco__order_items
+    description: Cleaned order line items at one row per order_item_id.
+    columns:
+      - name: order_item_id
+        description: Primary order line item identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: order_id
+        description: Order containing the line item.
+      - name: potion_sku
+        description: Potion sold on the line item.
+      - name: quantity
+        description: Ordered quantity cast to a number, defaulting invalid values to zero.
+      - name: unit_price
+        description: Unit price converted from cents to dollars.
+
+  - name: stg_merlinco__payments
+    description: Cleaned payment attempts at one row per payment_id.
+    columns:
+      - name: payment_id
+        description: Primary payment attempt identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: order_id
+        description: Order associated with the payment attempt.
+      - name: payment_method
+        description: Lowercased and trimmed payment method.
+      - name: payment_amount
+        description: Attempted payment amount converted from cents to dollars.
+      - name: payment_status
+        description: Lowercased and trimmed payment status.
+      - name: paid_at
+        description: Payment timestamp cast to a timestamp without a timezone.
+
+  - name: stg_merlinco__customers
+    description: Cleaned customer records at one row per customer_id.
+    columns:
+      - name: customer_id
+        description: Primary customer identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: full_name
+        description: Customer display name.
+      - name: email
+        description: Lowercased and trimmed customer email.
+      - name: home_region
+        description: Normalized customer home region.
+      - name: signed_up_at
+        description: Customer signup date.
+      - name: birth_year
+        description: Customer birth year cast to a number.
+      - name: favored_discipline
+        description: Customer favored discipline in title case.
+
+  - name: stg_merlinco__guild_memberships
+    description: Cleaned guild membership intervals at one row per membership_id.
+    columns:
+      - name: membership_id
+        description: Primary guild membership identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Customer associated with the membership.
+      - name: guild_id
+        description: Guild associated with the membership.
+      - name: guild_tier
+        description: Lowercased and trimmed guild tier.
+      - name: valid_from
+        description: Membership validity start date.
+      - name: valid_to
+        description: Membership validity end date, with blank values represented as null.
+
+  - name: stg_merlinco__shops
+    description: Cleaned shop records at one row per shop_id.
+    columns:
+      - name: shop_id
+        description: Primary shop identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: shop_name
+        description: Shop name.
+      - name: city
+        description: Shop city.
+      - name: shop_region
+        description: Shop region in title case.
+      - name: opened_at
+        description: Shop opening date.
+
+  - name: int_order_item_rollup
+    description: Order item measures aggregated to one row per order_id.
+    columns:
+      - name: order_id
+        description: Primary order identifier at the model grain.
+        data_tests:
+          - not_null
+          - unique
+      - name: item_quantity
+        description: Total item quantity on the order.
+      - name: gross_revenue
+        description: Gross order revenue in dollars before discounts.
+      - name: line_count
+        description: Number of order line items.
+      - name: distinct_potions
+        description: Number of distinct potion SKUs on the order.
+
+  - name: int_payments_rollup
+    description: Payment attempt measures aggregated to one row per order_id.
+    columns:
+      - name: order_id
+        description: Primary order identifier at the model grain.
+        data_tests:
+          - not_null
+          - unique
+      - name: paid_amount
+        description: Sum in dollars of successful payment attempts.
+      - name: latest_paid_at
+        description: Latest payment attempt timestamp, regardless of status.
+      - name: has_successful_payment
+        description: One when the order has a successful payment and zero otherwise.
+      - name: payment_attempt_count
+        description: Number of payment attempts for the order.
+
+  - name: int_current_guild_memberships
+    description: Latest-ranked guild membership at one row per customer_id.
+    columns:
+      - name: customer_id
+        description: Primary customer identifier at the model grain.
+        data_tests:
+          - not_null
+          - unique
+      - name: guild_id
+        description: Guild from the latest-ranked membership.
+      - name: guild_tier
+        description: Tier from the latest-ranked membership.
+      - name: valid_from
+        description: Membership validity start date.
+      - name: valid_to
+        description: Membership validity end date.
+
+  - name: fct_orders
+    description: Order profitability fact table at one row per order_id, combining order, customer, shop, guild, item, and payment attributes.
+    semantic_model:
+      enabled: true
+    agg_time_dimension: ordered_date
+    columns:
+      - name: order_id
+        description: Primary order identifier at the fact grain.
+        entity:
+          type: primary
+          name: order_record
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Customer that placed the order.
+        entity:
+          type: foreign
+          name: customer
+      - name: customer_name
+        description: Customer display name.
+      - name: customer_email
+        description: Normalized customer email.
+      - name: home_region
+        description: Normalized customer home region.
+        dimension:
+          type: categorical
+      - name: favored_discipline
+        description: Customer favored magical discipline.
+        dimension:
+          type: categorical
+      - name: guild_id
+        description: Customer guild from the latest-ranked membership.
+        entity:
+          type: foreign
+          name: guild
+      - name: guild_tier
+        description: Customer guild tier from the latest-ranked membership.
+        dimension:
+          type: categorical
+      - name: shop_id
+        description: Shop that fulfilled the order.
+        entity:
+          type: foreign
+          name: shop
+      - name: shop_name
+        description: Shop name.
+        dimension:
+          type: categorical
+      - name: shop_city
+        description: Shop city.
+        dimension:
+          type: categorical
+      - name: shop_region
+        description: Normalized shop region.
+        dimension:
+          type: categorical
+      - name: ordered_at
+        description: Order timestamp.
+      - name: ordered_date
+        description: Calendar date of the order.
+        granularity: day
+        dimension:
+          type: time
+      - name: order_status
+        description: Normalized order status.
+        dimension:
+          type: categorical
+      - name: order_channel
+        description: Normalized order channel.
+        dimension:
+          type: categorical
+      - name: item_quantity
+        description: Total item quantity on the order.
+      - name: line_count
+        description: Number of line items on the order.
+      - name: distinct_potions
+        description: Number of distinct potion SKUs on the order.
+      - name: gross_revenue
+        description: Gross order revenue in dollars before discounts.
+      - name: discount
+        description: Order discount in dollars.
+      - name: net_revenue
+        description: Gross revenue less discount in dollars.
+      - name: paid_amount
+        description: Sum in dollars of successful payment attempts.
+      - name: latest_paid_at
+        description: Latest payment attempt timestamp.
+      - name: payment_attempt_count
+        description: Number of payment attempts for the order.
+      - name: payment_state
+        description: Paid, cancelled, or unpaid state derived from successful payments and order status.
+        dimension:
+          type: categorical
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['paid', 'cancelled', 'unpaid']
+      - name: is_home_region_order
+        description: True when the customer home region matches the shop region.
+        dimension:
+          type: categorical
+      - name: loaded_at
+        description: Timestamp when dbt built the fact table.
+    metrics:
+      - name: total_revenue
+        description: Total order revenue after discounts.
+        label: Total Revenue
+        type: simple
+        agg: sum
+        expr: net_revenue
