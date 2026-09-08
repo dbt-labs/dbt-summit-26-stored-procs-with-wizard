@@ -1,0 +1,93 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: Cleaned order headers at one row per order, excluding records without an order ID.
+    columns:
+      - name: order_id
+        description: Primary order identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Customer that placed the order.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+      - name: shop_id
+        description: Shop that received the order.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_shops')
+                field: shop_id
+
+  - name: stg_order_items
+    description: Cleaned order lines at one row per order item.
+    columns:
+      - name: order_item_id
+        description: Primary order-line identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: order_id
+        description: Order containing the line item.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+
+  - name: stg_payments
+    description: Cleaned payment attempts at one row per payment attempt.
+    columns:
+      - name: payment_id
+        description: Primary payment-attempt identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: order_id
+        description: Order associated with the payment attempt.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+
+  - name: stg_customers
+    description: Cleaned customer records at one row per customer.
+    columns:
+      - name: customer_id
+        description: Primary customer identifier.
+        data_tests:
+          - not_null
+          - unique
+
+  - name: stg_guild_memberships
+    description: Cleaned guild membership history at one row per membership interval.
+    columns:
+      - name: membership_id
+        description: Primary membership identifier used for deterministic interval tie-breaking.
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Customer holding the guild membership.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+      - name: guild_id
+        description: Guild associated with the membership interval.
+
+  - name: stg_shops
+    description: Cleaned shop records at one row per shop.
+    columns:
+      - name: shop_id
+        description: Primary shop identifier.
+        data_tests:
+          - not_null
+          - unique

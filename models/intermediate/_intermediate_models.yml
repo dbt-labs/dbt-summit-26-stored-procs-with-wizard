@@ -1,0 +1,78 @@
+version: 2
+
+models:
+  - name: int_order_item_rollup
+    description: Order-item measures rolled up to exactly one row per order for profitability reporting.
+    columns:
+      - name: order_id
+        description: Primary order identifier and grain of the model.
+        data_tests:
+          - not_null
+          - unique
+      - name: item_quantity
+        description: Total quantity across all line items on the order.
+      - name: gross_revenue_copper
+        description: Sum of line-item quantity multiplied by unit price in copper coins.
+      - name: gross_revenue_gold
+        description: Gross order revenue converted from copper to gold at 100 copper per gold.
+      - name: line_count
+        description: Number of order-item rows on the order.
+      - name: distinct_potions
+        description: Number of distinct non-null potion SKUs on the order.
+
+
+  - name: int_payments_rollup
+    description: Payment attempts rolled up to one row per order, with successful amounts separated from all-attempt activity.
+    columns:
+      - name: order_id
+        description: Primary order identifier and grain of the model.
+        data_tests:
+          - not_null
+          - unique
+      - name: paid_amount_copper
+        description: Total copper amount from payment attempts whose normalized status is success.
+      - name: paid_amount_gold
+        description: Successful paid amount converted from copper to gold at 100 copper per gold.
+      - name: latest_paid_at
+        description: Latest parsed payment timestamp across all attempts, regardless of status.
+      - name: has_successful_payment
+        description: Integer flag equal to 1 when the order has at least one successful payment, otherwise 0.
+      - name: payment_attempt_count
+        description: Count of all payment attempts associated with the order.
+
+
+  - name: int_memberships_current
+    description: One selected guild membership per customer using the legacy latest-interval ranking rule.
+    columns:
+      - name: customer_id
+        description: Primary customer identifier and grain of the model.
+        data_tests:
+          - not_null
+          - unique
+      - name: guild_id
+        description: Guild from the highest-ranked membership interval.
+      - name: guild_tier
+        description: Normalized tier from the highest-ranked membership interval.
+      - name: valid_from
+        description: Start date of the selected membership interval.
+      - name: valid_to
+        description: End date of the selected interval; null represents an open-ended membership.
+
+unit_tests:
+  - name: test_int_memberships_current_tie_breaking
+    description: Open-ended intervals rank first, followed by later start dates and then higher membership IDs.
+    model: int_memberships_current
+    given:
+      - input: ref('stg_guild_memberships')
+        rows:
+          - {membership_id: MEM-OPEN-001, customer_id: CUST-OPEN, guild_id: GLD-CLOSED, guild_tier: adept, valid_from: 2025-01-01, valid_to: 2025-12-31}
+          - {membership_id: MEM-OPEN-002, customer_id: CUST-OPEN, guild_id: GLD-OPEN, guild_tier: archmage, valid_from: 2024-01-01, valid_to: null}
+          - {membership_id: MEM-FROM-001, customer_id: CUST-FROM, guild_id: GLD-OLDER, guild_tier: apprentice, valid_from: 2024-01-01, valid_to: 2025-12-31}
+          - {membership_id: MEM-FROM-002, customer_id: CUST-FROM, guild_id: GLD-NEWER, guild_tier: adept, valid_from: 2025-01-01, valid_to: 2025-12-31}
+          - {membership_id: MEM-TIE-001, customer_id: CUST-TIE, guild_id: GLD-LOWER-ID, guild_tier: apprentice, valid_from: 2025-01-01, valid_to: 2025-12-31}
+          - {membership_id: MEM-TIE-002, customer_id: CUST-TIE, guild_id: GLD-HIGHER-ID, guild_tier: archmage, valid_from: 2025-01-01, valid_to: 2025-12-31}
+    expect:
+      rows:
+        - {customer_id: CUST-OPEN, guild_id: GLD-OPEN, guild_tier: archmage, valid_from: 2024-01-01, valid_to: null}
+        - {customer_id: CUST-FROM, guild_id: GLD-NEWER, guild_tier: adept, valid_from: 2025-01-01, valid_to: 2025-12-31}
+        - {customer_id: CUST-TIE, guild_id: GLD-HIGHER-ID, guild_tier: archmage, valid_from: 2025-01-01, valid_to: 2025-12-31}

@@ -1,0 +1,159 @@
+version: 2
+
+models:
+  - name: fct_order_profitability
+    description: One row per order with legacy-parity revenue, payment, customer, current-membership, and shop attributes.
+    semantic_model:
+      enabled: true
+    agg_time_dimension: ordered_date
+    columns:
+      - name: order_id
+        description: Primary order identifier and grain of the fact table.
+        entity:
+          type: primary
+          name: order
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Customer that placed the order.
+        entity:
+          type: foreign
+          name: customer
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+      - name: customer_name
+        description: Full name from the customer record associated with the order; null when the customer cannot be matched.
+      - name: customer_email
+        description: Lowercased and trimmed email from the customer record associated with the order; null when unavailable.
+      - name: home_region
+        description: Customer home region with whitespace and capitalization standardized and `NR` expanded to `Northern Reaches`.
+        dimension:
+          type: categorical
+      - name: favored_discipline
+        description: Customer's favored magical discipline with whitespace and capitalization standardized.
+        dimension:
+          type: categorical
+      - name: guild_id
+        description: Guild from the customer's highest-ranked membership interval under the legacy current-membership rule; null when no membership exists.
+      - name: guild_tier
+        description: Normalized tier from the customer's highest-ranked membership interval; null when no membership exists.
+        dimension:
+          type: categorical
+      - name: shop_id
+        description: Shop that received the order.
+        entity:
+          type: foreign
+          name: shop
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_shops')
+                field: shop_id
+      - name: shop_name
+        description: Name of the shop that received the order; null when the shop cannot be matched.
+      - name: shop_city
+        description: City of the shop that received the order; null when the shop cannot be matched.
+      - name: shop_region
+        description: Shop region with whitespace and capitalization standardized; null when the shop cannot be matched.
+        dimension:
+          type: categorical
+      - name: ordered_at
+        description: Order timestamp parsed as a timestamp without time zone; null when the source value cannot be parsed.
+      - name: ordered_date
+        description: Calendar date derived from `ordered_at` for date-grain reporting.
+        granularity: day
+        dimension:
+          type: time
+      - name: order_status
+        description: Source order status normalized to lowercase with surrounding whitespace removed.
+        dimension:
+          type: categorical
+      - name: order_channel
+        description: Source order channel normalized to lowercase with surrounding whitespace removed.
+        dimension:
+          type: categorical
+      - name: item_quantity
+        description: Total quantity across all line items on the order; null when the order has no item rollup.
+      - name: line_count
+        description: Number of order-item rows associated with the order; null when the order has no item rollup.
+      - name: distinct_potions
+        description: Number of distinct non-null potion SKUs on the order; null when the order has no item rollup.
+      - name: gross_revenue_copper
+        description: Gross line-item revenue in copper before the order discount.
+      - name: gross_revenue_gold
+        description: Gross line-item revenue converted to gold at 100 copper per gold.
+      - name: discount_copper
+        description: Order discount in copper, with invalid or missing source values treated as zero.
+      - name: discount_gold
+        description: Order discount converted to gold at 100 copper per gold.
+      - name: net_revenue_copper
+        description: Gross revenue minus the order discount in copper; null when the order has no item rollup.
+      - name: net_revenue_gold
+        description: Gross revenue minus the order discount in gold; null when the order has no item rollup.
+      - name: paid_amount_copper
+        description: Total successful payment amount in copper; null when the order has no payment attempts.
+      - name: paid_amount_gold
+        description: Total successful payment amount in gold; null when the order has no payment attempts.
+      - name: latest_paid_at
+        description: Latest parsed payment-attempt timestamp for the order, regardless of whether the attempt succeeded; null when no parseable attempt timestamp exists.
+      - name: payment_attempt_count
+        description: Number of payment attempts associated with the order, including unsuccessful attempts; null when no payment rollup exists.
+      - name: payment_state
+        description: Paid when any successful payment exists, otherwise cancelled for cancelled orders, else unpaid.
+        dimension:
+          type: categorical
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['paid', 'cancelled', 'unpaid']
+      - name: is_home_region_order
+        description: True when normalized customer and shop regions match; false for mismatches or missing regions.
+      - name: loaded_at
+        description: Timestamp when dbt built the fact table; it is regenerated for every full table rebuild.
+    metrics:
+      - name: order_count
+        label: Order Count
+        description: Count of non-null order IDs at the fact's one-row-per-order grain. Includes every order status, channel, and payment state; cancelled orders and refunds are not excluded.
+        type: simple
+        agg: count
+        expr: order_id
+      - name: gross_revenue_gold
+        label: Gross Revenue Gold
+        description: Sum of pre-discount line-item revenue in gold across order-grain rows. Includes every order status and payment state; orders without an item rollup contribute no value, and cancelled orders and refunds are not excluded.
+        type: simple
+        agg: sum
+        expr: gross_revenue_gold
+      - name: discount_gold
+        label: Discount Gold
+        description: Sum of order discounts in gold across order-grain rows, with invalid or missing source discounts already treated as zero in the fact. Includes every order status and payment state; cancelled orders and refunds are not excluded.
+        type: simple
+        agg: sum
+        expr: discount_gold
+      - name: net_revenue_gold
+        label: Net Revenue Gold
+        description: Sum of gross revenue less order discount in gold across order-grain rows. Orders without an item rollup contribute no value; every order status and payment state is included, with no cancellation or refund adjustment.
+        type: simple
+        agg: sum
+        expr: net_revenue_gold
+      - name: paid_amount_gold
+        label: Paid Amount Gold
+        description: Sum of successful payment amounts in gold across order-grain rows. Orders without payment attempts contribute no value; every order status is included, with no separate refund adjustment.
+        type: simple
+        agg: sum
+        expr: paid_amount_gold
+      - name: item_quantity
+        label: Item Quantity
+        description: Sum of line-item quantity across order-grain rows. Orders without an item rollup contribute no value; every order status and payment state is included, with no cancellation or refund exclusion.
+        type: simple
+        agg: sum
+        expr: item_quantity
+      - name: distinct_potions
+        label: Distinct Potions
+        description: Sum of each order's distinct non-null potion SKU count across order-grain rows. The same SKU is counted once per order and can be counted again on another order; orders without an item rollup contribute no value, and no order status or payment state is excluded.
+        type: simple
+        agg: sum
+        expr: distinct_potions

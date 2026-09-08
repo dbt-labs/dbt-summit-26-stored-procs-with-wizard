@@ -8,7 +8,7 @@ sources:
     tables:
       - name: RAW_CUSTOMERS
         identifier: RAW_CUSTOMERS
-        description: Raw customer records.
+        description: One row per customer, identified by customer ID.
         columns:
           - name: CUSTOMER_ID
             description: Primary customer identifier.
@@ -29,7 +29,7 @@ sources:
             description: Customer favored magical discipline.
       - name: RAW_SHOPS
         identifier: RAW_SHOPS
-        description: Raw shop locations.
+        description: One row per shop, identified by shop ID.
         columns:
           - name: SHOP_ID
             description: Primary shop identifier.
@@ -123,7 +123,7 @@ sources:
             description: Recipe unit.
       - name: RAW_ORDERS
         identifier: RAW_ORDERS
-        description: Raw order headers.
+        description: One row per order header, identified by order ID.
         columns:
           - name: ORDER_ID
             description: Primary order identifier.
@@ -144,7 +144,7 @@ sources:
             description: Order discount in copper coins as text.
       - name: RAW_ORDER_ITEMS
         identifier: RAW_ORDER_ITEMS
-        description: Raw order line items.
+        description: One row per order line, identified by order item ID.
         columns:
           - name: ORDER_ITEM_ID
             description: Primary order item identifier.
@@ -161,7 +161,7 @@ sources:
             description: Unit price in copper coins as text.
       - name: RAW_PAYMENTS
         identifier: RAW_PAYMENTS
-        description: Raw payment attempts.
+        description: One row per payment attempt, identified by payment ID.
         columns:
           - name: PAYMENT_ID
             description: Primary payment identifier.
@@ -193,7 +193,7 @@ sources:
             description: Guild founded year as text.
       - name: RAW_GUILD_MEMBERSHIPS
         identifier: RAW_GUILD_MEMBERSHIPS
-        description: Raw customer guild membership intervals.
+        description: One row per customer-guild membership interval, identified by membership ID.
         columns:
           - name: MEMBERSHIP_ID
             description: Primary membership identifier.
