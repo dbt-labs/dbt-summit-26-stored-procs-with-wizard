@@ -103,23 +103,32 @@ Use it as a reference and adapt it for your environment. Before relying on it fo
 
 ```text
 .
+├── .github/
+│   ├── workflows/
+│   │   └── codeowners-check.yml
+│   └── CODEOWNERS
 ├── analyses/
+│   ├── Cheatsheet/
+│   │   └── dbt_order_profitability_workshop_cheatsheet.md
+│   ├── Example_Prompt
 │   ├── legacy_sp_load_order_profitability.sql
-│   ├── legacy_sp_load_order_profitability_migration_plan.md
-│   └── dbt_order_profitability_workshop_cheatsheet.md
+│   └── legacy_sp_load_order_profitability_migration_plan.md
+├── macros/                              # project macros (.gitkeep)
 ├── models/
-│   ├── staging/
-│   │   └── _merlinco_sources.yml
-│   └── example/                         # default dbt starter models
-├── macros/
-├── seeds/
-├── snapshots/
-├── tests/
+│   └── staging/
+│       └── _merlinco_sources.yml
+├── seeds/                               # project seeds (.gitkeep)
+├── snapshots/                           # project snapshots (.gitkeep)
+├── staging/
+│   └── _merlinco_sources.yml
+├── tests/                               # singular data tests (.gitkeep)
+├── .gitignore
 ├── dbt_project.yml
+├── LICENSE
 └── README.md
 ```
 
-As you progress, add the staging, intermediate, and mart models under `models/`, with their model and column documentation in colocated schema YAML files.
+Add staging, intermediate, and mart models under `models/`, with model and column documentation in colocated schema YAML files as you progress.
 
 ## Useful commands
 
