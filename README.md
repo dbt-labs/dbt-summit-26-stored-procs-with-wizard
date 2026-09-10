@@ -4,6 +4,10 @@
 
 dbt show --inline "select current_user()" --limit 1
 
+## Training Survey (pls fill out :D)
+
+dbtlearn.typeform.com/dbt-summit-labs
+
 ## What this repository is
 
 This is a hands-on dbt workshop repository for migrating the Snowflake stored procedure `sp_load_order_profitability` into a tested, documented dbt DAG using dbt Wizard.
