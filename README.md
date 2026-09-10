@@ -6,7 +6,13 @@ dbt show --inline "select current_user()" --limit 1
 
 ## Training Survey (pls fill out :D)
 
-dbtlearn.typeform.com/dbt-summit-labs
+[dbtlearn.typeform.com/dbt-summit-labs
+](https://dbtlearn.typeform.com/dbt-summit-labs)
+
+## Slides
+
+[Migrate Stored Procs with dbt Wizard - HOL Deck.pdf](https://github.com/user-attachments/files/32065959/WIP.Migrate.Stored.Procs.with.dbt.Wizard.-.HOL.Deck.pdf)
+
 
 ## What this repository is
 
