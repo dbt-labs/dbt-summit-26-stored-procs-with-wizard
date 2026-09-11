@@ -1,0 +1,59 @@
+version: 2
+
+models:
+  - name: int_order_item_rollup
+    description: One row per order with line-item quantities, revenue, line counts, and distinct potion counts aggregated using legacy procedure semantics.
+    columns:
+      - name: order_id
+        description: Unique identifier for the order represented by the rollup.
+        data_tests:
+          - unique
+          - not_null
+      - name: item_quantity
+        description: Sum of normalized quantities across all line items for the order.
+      - name: gross_revenue_copper
+        description: Sum of line-item quantity multiplied by unit price, in copper coins.
+      - name: gross_revenue_gold
+        description: Sum of each line's gross revenue converted from copper coins to gold coins.
+      - name: line_count
+        description: Count of source line-item rows for the order.
+      - name: distinct_potions
+        description: Count of distinct potion SKUs on the order.
+
+  - name: int_payments_rollup
+    description: One row per order with successful-payment totals and attempt-level summary fields using legacy procedure semantics.
+    columns:
+      - name: order_id
+        description: Unique identifier for the order represented by the payment rollup.
+        data_tests:
+          - unique
+          - not_null
+      - name: paid_amount_copper
+        description: Sum of payment amounts in copper coins for attempts whose normalized status is success.
+      - name: paid_amount_gold
+        description: Sum of successful payment amounts converted from copper coins to gold coins.
+      - name: latest_paid_at
+        description: Latest parsed payment timestamp across all attempts for the order.
+      - name: has_successful_payment
+        description: Numeric flag equal to one when any payment attempt succeeded, otherwise zero.
+      - name: payment_attempt_count
+        description: Count of all payment-attempt rows for the order, regardless of status.
+
+
+  - name: int_memberships_current
+    description: One current guild membership per customer, selected with the legacy open-ended, date, and membership identifier tie-break rule.
+    columns:
+      - name: customer_id
+        description: Unique identifier for the customer whose current membership is represented.
+        data_tests:
+          - unique
+          - not_null
+      - name: guild_id
+        description: Identifier of the guild on the selected membership record.
+      - name: guild_tier
+        description: Normalized tier from the selected membership record.
+      - name: valid_from
+        description: Validity start date of the selected membership record.
+      - name: valid_to
+        description: Validity end date of the selected membership record; null indicates an open-ended membership.
+

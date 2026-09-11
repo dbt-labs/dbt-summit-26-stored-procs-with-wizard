@@ -1,0 +1,45 @@
+version: 2
+
+unit_tests:
+  - name: test_int_memberships_current_tie_breaking
+    description: Open-ended memberships rank first, and membership_id deterministically breaks ties when validity dates match.
+    model: int_memberships_current
+    given:
+      - input: ref('stg_guild_memberships')
+        rows:
+          - membership_id: MEM-OPEN
+            customer_id: CUST-OPEN
+            guild_id: GLD-OPEN
+            guild_tier: archmage
+            valid_from: 2024-01-01
+            valid_to: null
+          - membership_id: MEM-CLOSED
+            customer_id: CUST-OPEN
+            guild_id: GLD-CLOSED
+            guild_tier: adept
+            valid_from: 2025-01-01
+            valid_to: 2026-12-31
+          - membership_id: MEM-200
+            customer_id: CUST-TIE
+            guild_id: GLD-LOWER-ID
+            guild_tier: apprentice
+            valid_from: 2025-06-01
+            valid_to: 2025-12-31
+          - membership_id: MEM-201
+            customer_id: CUST-TIE
+            guild_id: GLD-HIGHER-ID
+            guild_tier: adept
+            valid_from: 2025-06-01
+            valid_to: 2025-12-31
+    expect:
+      rows:
+        - customer_id: CUST-OPEN
+          guild_id: GLD-OPEN
+          guild_tier: archmage
+          valid_from: 2024-01-01
+          valid_to: null
+        - customer_id: CUST-TIE
+          guild_id: GLD-HIGHER-ID
+          guild_tier: adept
+          valid_from: 2025-06-01
+          valid_to: 2025-12-31
