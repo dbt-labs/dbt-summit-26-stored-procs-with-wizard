@@ -142,9 +142,9 @@ begin
     left join tmp_shop_clean s
         on o.shop_id = s.shop_id;
 
-    delete from DBT_LEARN.DBT_WORKSHOP_SNGUYEN_9A94C0.legacy_fct_order_profitability;
+    delete from DBT_LEARN.DBT_"INPUT_USERNAME".legacy_fct_order_profitability;
 
-    insert into DBT_LEARN.DBT_WORKSHOP_SNGUYEN_9A94C0.legacy_fct_order_profitability (
+    insert into DBT_LEARN.DBT_"INPUT_USERNAME".legacy_fct_order_profitability (
         order_id,
         customer_id,
         customer_name,
@@ -216,7 +216,7 @@ begin
     select count(*) into :v_rows_inserted
     from tmp_fct_order_profitability;
 
-    return 'Loaded DBT_LEARN.DBT_WORKSHOP_SNGUYEN_9A94C0.legacy_fct_order_profitability with ' || v_rows_inserted || ' rows';
+    return 'Loaded DBT_LEARN.DBT_"INPUT_USERNAME".legacy_fct_order_profitability with ' || v_rows_inserted || ' rows';
 end;
 $$;
 
