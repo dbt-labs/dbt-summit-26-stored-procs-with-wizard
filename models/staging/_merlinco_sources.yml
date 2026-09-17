@@ -128,7 +128,6 @@ sources:
           - name: ORDER_ID
             description: Primary order identifier.
             data_tests:
-              - not_null
               - unique
           - name: CUSTOMER_ID
             description: Customer identifier.

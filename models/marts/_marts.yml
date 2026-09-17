@@ -1,0 +1,99 @@
+version: 2
+
+models:
+  - name: fct_order_revenue
+    description: >-
+      Order revenue and payment fact at exactly one row per order. The model preserves the legacy
+      procedure's current-membership, null-rollup, monetary, and payment-state behavior. Despite
+      replacing a relation named profitability, it does not calculate profit because no cost input exists.
+    columns:
+      - name: order_id
+        description: Primary order identifier and fact grain.
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Customer associated with the order; orphaned keys are retained for legacy parity.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+              config:
+                severity: warn
+      - name: customer_name
+        description: Customer name at the time the model was built.
+      - name: customer_email
+        description: Normalized customer email at the time the model was built.
+      - name: home_region
+        description: Standardized customer home region.
+      - name: favored_discipline
+        description: Customer favored discipline.
+      - name: guild_id
+        description: Guild from the customer's latest recorded membership, not membership as of the order date.
+      - name: guild_tier
+        description: Tier from the customer's latest recorded membership.
+      - name: shop_id
+        description: Shop associated with the order; orphaned keys are retained for legacy parity.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_shops')
+                field: shop_id
+              config:
+                severity: warn
+      - name: shop_name
+        description: Shop name.
+      - name: shop_city
+        description: Shop city.
+      - name: shop_region
+        description: Standardized shop region.
+      - name: ordered_at
+        description: Parsed order timestamp.
+      - name: ordered_date
+        description: Calendar date of the order.
+      - name: order_status
+        description: Normalized order status.
+      - name: order_channel
+        description: Normalized sales channel.
+      - name: item_quantity
+        description: Total item quantity; null when no item rollup exists.
+      - name: line_count
+        description: Number of order-item rows; null when no item rollup exists.
+      - name: distinct_potions
+        description: Number of distinct potion SKUs; null when no item rollup exists.
+      - name: gross_revenue_copper
+        description: Gross item revenue in copper; null when no item rollup exists.
+      - name: gross_revenue_gold
+        description: Gross item revenue converted to gold; null when no item rollup exists.
+      - name: discount_copper
+        description: Order-level discount in copper.
+      - name: discount_gold
+        description: Order-level discount converted to gold.
+      - name: net_revenue_copper
+        description: Gross revenue less discount in copper; this is revenue, not profit.
+      - name: net_revenue_gold
+        description: Gross revenue less discount in gold; this is revenue, not profit.
+      - name: paid_amount_copper
+        description: Successful payment amount in copper; null when no payment attempt exists.
+      - name: paid_amount_gold
+        description: Successful payment amount converted to gold; null when no payment attempt exists.
+      - name: latest_paid_at
+        description: Latest timestamp across all payment attempts, including unsuccessful attempts.
+      - name: payment_attempt_count
+        description: Number of payment attempts; null when no payment attempt exists.
+      - name: payment_state
+        description: Paid if any attempt succeeded, cancelled for unpaid cancelled orders, and unpaid otherwise.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [paid, cancelled, unpaid]
+      - name: is_home_region_order
+        description: True when normalized customer and shop regions match; false when either value is absent.
+      - name: loaded_at
+        description: Timestamp when dbt built the fact; excluded from legacy parity comparisons.
+
+  - name: legacy_fct_order_profitability
+    description: >-
+      Disabled-by-default compatibility view exposing fct_order_revenue under the legacy relation name.
+      Enable only during approved cutover with enable_order_revenue_compatibility_view=true.

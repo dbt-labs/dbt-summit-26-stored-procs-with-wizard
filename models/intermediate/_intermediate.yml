@@ -1,0 +1,73 @@
+version: 2
+
+models:
+  - name: int_order_item_rollup
+    description: Order-item measures aggregated to exactly one row per order.
+    columns:
+      - name: order_id
+        description: Primary order identifier at the model grain.
+        data_tests:
+          - not_null
+          - unique
+      - name: item_quantity
+        description: Total item quantity, treating malformed or missing quantities as zero for legacy parity.
+      - name: gross_revenue_copper
+        description: Sum of quantity multiplied by unit price in copper.
+      - name: gross_revenue_gold
+        description: Gross revenue converted to gold using the legacy calculation order.
+      - name: line_count
+        description: Count of source order-item rows.
+      - name: distinct_potions
+        description: Count of distinct potion SKUs on the order.
+
+  - name: int_payments_rollup
+    description: Payment activity aggregated to exactly one row per order; only successful attempts contribute to paid amounts.
+    columns:
+      - name: order_id
+        description: Primary order identifier at the model grain.
+        data_tests:
+          - not_null
+          - unique
+      - name: paid_amount_copper
+        description: Sum of successful payment amounts in copper.
+      - name: paid_amount_gold
+        description: Sum of successful payment amounts converted to gold.
+      - name: latest_paid_at
+        description: Latest timestamp across all payment attempts, including unsuccessful attempts, for legacy parity.
+      - name: has_successful_payment
+        description: Integer flag indicating whether any payment attempt succeeded.
+      - name: payment_attempt_count
+        description: Count of all payment attempts.
+
+  - name: int_memberships_current
+    description: Latest recorded guild membership per customer, independent of order date, using the legacy deterministic tie-break rule.
+    columns:
+      - name: customer_id
+        description: Primary customer identifier at the model grain.
+        data_tests:
+          - not_null
+          - unique
+      - name: guild_id
+        description: Guild on the selected membership record.
+      - name: guild_tier
+        description: Tier on the selected membership record.
+      - name: valid_from
+        description: Start date of the selected membership record.
+      - name: valid_to
+        description: End date of the selected membership record; null indicates open-ended membership.
+
+unit_tests:
+  - name: int_memberships_current_selects_latest_record_deterministically
+    description: Open-ended memberships win, followed by latest valid_from and highest membership_id.
+    model: int_memberships_current
+    given:
+      - input: ref('stg_guild_memberships')
+        rows:
+          - {membership_id: 10, customer_id: 1, guild_id: 100, guild_tier: silver, valid_from: '2024-01-01', valid_to: '2025-12-31'}
+          - {membership_id: 11, customer_id: 1, guild_id: 101, guild_tier: gold, valid_from: '2023-01-01', valid_to: null}
+          - {membership_id: 20, customer_id: 2, guild_id: 200, guild_tier: silver, valid_from: '2024-06-01', valid_to: '2025-06-01'}
+          - {membership_id: 21, customer_id: 2, guild_id: 201, guild_tier: gold, valid_from: '2024-06-01', valid_to: '2025-06-01'}
+    expect:
+      rows:
+        - {customer_id: 1, guild_id: 101, guild_tier: gold, valid_from: '2023-01-01', valid_to: null}
+        - {customer_id: 2, guild_id: 201, guild_tier: gold, valid_from: '2024-06-01', valid_to: '2025-06-01'}
