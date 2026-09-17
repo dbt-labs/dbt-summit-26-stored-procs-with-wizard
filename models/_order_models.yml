@@ -1,0 +1,148 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: Cleaned order headers at one row per non-null order_id.
+    columns:
+      - name: order_id
+        description: Primary identifier for an order.
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Customer who placed the order.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+      - name: discount_cents
+        description: Order discount in source cents.
+      - name: discount
+        description: Order discount in dollars, calculated as cents divided by 100.0.
+
+  - name: stg_order_items
+    description: Cleaned order lines at one row per order_item_id.
+    columns:
+      - name: order_item_id
+        description: Primary identifier for an order line.
+        data_tests:
+          - not_null
+          - unique
+      - name: order_id
+        description: Order containing the line.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+      - name: unit_price_cents
+        description: Unit price in source cents.
+      - name: unit_price
+        description: Unit price in dollars, calculated as cents divided by 100.0.
+
+  - name: stg_payments
+    description: Cleaned payment attempts at one row per payment_id.
+    columns:
+      - name: payment_id
+        description: Primary identifier for a payment attempt.
+        data_tests:
+          - not_null
+          - unique
+      - name: order_id
+        description: Order associated with the payment attempt.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+      - name: amount_cents
+        description: Payment-attempt amount in source cents.
+      - name: amount
+        description: Payment-attempt amount in dollars, calculated as cents divided by 100.0.
+
+  - name: stg_customers
+    description: Cleaned customers at one row per customer_id.
+    columns:
+      - name: customer_id
+        description: Primary identifier for a customer.
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_name
+        description: Trimmed customer display name.
+
+  - name: int_order_item_rollup
+    description: Order-item quantities and gross revenue aggregated to one row per order_id.
+    columns:
+      - name: order_id
+        description: Primary identifier for an order with at least one item.
+        data_tests:
+          - not_null
+          - unique
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+      - name: item_quantity
+        description: Total quantity across all lines on the order.
+      - name: gross_revenue
+        description: Gross line-item revenue in dollars before order discount.
+
+  - name: int_payments_rollup
+    description: Successful paid amount and payment-success flag aggregated to one row per order_id.
+    columns:
+      - name: order_id
+        description: Primary identifier for an order with at least one payment attempt.
+        data_tests:
+          - not_null
+          - unique
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+      - name: paid_amount
+        description: Total successful payment amount in dollars; failed and refunded attempts contribute zero.
+      - name: has_successful_payment
+        description: One when any payment attempt succeeded, otherwise zero.
+
+  - name: fct_orders
+    description: One row per order with customer context, order-item measures, discounts, and payment state.
+    config:
+      materialized: table
+    columns:
+      - name: order_id
+        description: Primary identifier for the order fact.
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Customer who placed the order.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+      - name: customer_name
+        description: Customer display name at model build time.
+      - name: item_quantity
+        description: Total item quantity on the order.
+      - name: gross_revenue
+        description: Gross line-item revenue in dollars before discount.
+      - name: discount
+        description: Order-level discount in dollars.
+      - name: net_revenue
+        description: Gross revenue less discount, in dollars.
+      - name: paid_amount
+        description: Total successful payment amount in dollars; null when no payment attempts exist.
+      - name: payment_state
+        description: Paid when any payment succeeds, cancelled for an unpaid cancelled order, and unpaid otherwise.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - paid
+                  - cancelled
+                  - unpaid
