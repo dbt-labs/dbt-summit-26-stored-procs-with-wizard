@@ -11,8 +11,20 @@ models:
           - unique
       - name: customer_id
         description: Customer who placed the order.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
       - name: shop_id
         description: Shop associated with the order.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_shops')
+                field: shop_id
       - name: ordered_at
         description: Parsed order timestamp.
       - name: order_status
@@ -34,6 +46,12 @@ models:
           - unique
       - name: order_id
         description: Order containing the line item.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
       - name: potion_sku
         description: Potion sold on the line item.
       - name: quantity
@@ -51,6 +69,12 @@ models:
           - unique
       - name: order_id
         description: Order associated with the payment attempt.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
       - name: payment_method
         description: Lowercase normalized payment method.
       - name: amount_copper
@@ -91,6 +115,12 @@ models:
           - unique
       - name: customer_id
         description: Customer holding the membership.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
       - name: guild_id
         description: Guild associated with the membership.
       - name: guild_tier
