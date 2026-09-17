@@ -1,0 +1,124 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: Cleaned order headers at one row per order_id; null order IDs are excluded to preserve the legacy procedure contract.
+    columns:
+      - name: order_id
+        description: Primary order identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Customer that placed the order.
+      - name: shop_id
+        description: Shop that received the order.
+      - name: ordered_at
+        description: Parsed order timestamp.
+      - name: order_status
+        description: Lowercase, trimmed order status.
+      - name: order_channel
+        description: Lowercase, trimmed order channel.
+      - name: discount_copper
+        description: Order discount in copper coins, defaulting invalid or null values to zero.
+      - name: discount_gold
+        description: Order discount converted to gold at 100 copper per gold.
+
+  - name: stg_order_items
+    description: Cleaned order line items at one row per order_item_id.
+    columns:
+      - name: order_item_id
+        description: Primary order-line identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: order_id
+        description: Order containing the line item.
+        data_tests:
+          - not_null
+      - name: potion_sku
+        description: Potion sold on the line.
+      - name: quantity
+        description: Parsed item quantity.
+      - name: unit_price_copper
+        description: Parsed unit price in copper coins.
+
+  - name: stg_payments
+    description: Cleaned payment attempts at one row per payment_id.
+    columns:
+      - name: payment_id
+        description: Primary payment-attempt identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: order_id
+        description: Order associated with the payment attempt.
+        data_tests:
+          - not_null
+      - name: payment_method
+        description: Lowercase, trimmed payment method.
+      - name: amount_copper
+        description: Parsed attempted payment amount in copper coins.
+      - name: payment_status
+        description: Lowercase, trimmed payment status.
+      - name: paid_at
+        description: Parsed payment timestamp.
+
+  - name: stg_customers
+    description: Cleaned customer records at one row per customer_id.
+    columns:
+      - name: customer_id
+        description: Primary customer identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: full_name
+        description: Customer display name.
+      - name: email
+        description: Lowercase, trimmed customer email.
+      - name: home_region
+        description: Standardized customer home region, including expansion of NR to Northern Reaches.
+      - name: signed_up_at
+        description: Parsed signup date.
+      - name: birth_year
+        description: Parsed birth year.
+      - name: favored_discipline
+        description: Title-cased favored magical discipline.
+
+  - name: stg_guild_memberships
+    description: Cleaned guild membership history at one row per membership_id.
+    columns:
+      - name: membership_id
+        description: Primary membership identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Customer holding the membership.
+        data_tests:
+          - not_null
+      - name: guild_id
+        description: Guild associated with the membership.
+      - name: guild_tier
+        description: Lowercase, trimmed membership tier.
+      - name: valid_from
+        description: Parsed membership start date.
+      - name: valid_to
+        description: Parsed membership end date; null indicates an open interval.
+
+  - name: stg_shops
+    description: Cleaned shop records at one row per shop_id.
+    columns:
+      - name: shop_id
+        description: Primary shop identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: shop_name
+        description: Shop display name.
+      - name: city
+        description: City containing the shop.
+      - name: shop_region
+        description: Title-cased shop region.
+      - name: opened_at
+        description: Parsed shop opening date.
