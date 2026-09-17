@@ -1,0 +1,118 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: Cleaned order headers at one row per order.
+    columns:
+      - name: order_id
+        description: Primary order identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Customer who placed the order.
+      - name: shop_id
+        description: Shop associated with the order.
+      - name: ordered_at
+        description: Parsed order timestamp.
+      - name: order_status
+        description: Lowercase normalized order status.
+      - name: order_channel
+        description: Lowercase normalized order channel.
+      - name: discount_copper
+        description: Order discount in copper coins, defaulting invalid values to zero.
+      - name: discount_gold
+        description: Order discount converted to gold coins.
+
+  - name: stg_order_items
+    description: Cleaned order line items at one row per order item.
+    columns:
+      - name: order_item_id
+        description: Primary order item identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: order_id
+        description: Order containing the line item.
+      - name: potion_sku
+        description: Potion sold on the line item.
+      - name: quantity
+        description: Parsed item quantity, defaulting invalid values to zero.
+      - name: unit_price_copper
+        description: Parsed unit price in copper coins, defaulting invalid values to zero.
+
+  - name: stg_payments
+    description: Cleaned payment attempts at one row per payment attempt.
+    columns:
+      - name: payment_id
+        description: Primary payment attempt identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: order_id
+        description: Order associated with the payment attempt.
+      - name: payment_method
+        description: Lowercase normalized payment method.
+      - name: amount_copper
+        description: Parsed attempted payment amount in copper coins.
+      - name: payment_status
+        description: Lowercase normalized payment status.
+      - name: paid_at
+        description: Parsed payment attempt timestamp.
+
+  - name: stg_customers
+    description: Cleaned customer records at one row per customer.
+    columns:
+      - name: customer_id
+        description: Primary customer identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: full_name
+        description: Customer display name.
+      - name: email
+        description: Lowercase normalized customer email.
+      - name: home_region
+        description: Normalized customer home region.
+      - name: signed_up_at
+        description: Parsed customer signup date.
+      - name: birth_year
+        description: Parsed customer birth year.
+      - name: favored_discipline
+        description: Normalized favored magical discipline.
+
+  - name: stg_guild_memberships
+    description: Cleaned guild membership history at one row per membership record.
+    columns:
+      - name: membership_id
+        description: Primary membership identifier and final current-record tie-breaker.
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Customer holding the membership.
+      - name: guild_id
+        description: Guild associated with the membership.
+      - name: guild_tier
+        description: Lowercase normalized membership tier.
+      - name: valid_from
+        description: Parsed membership start date.
+      - name: valid_to
+        description: Parsed membership end date; null means open-ended.
+
+  - name: stg_shops
+    description: Cleaned shop records at one row per shop.
+    columns:
+      - name: shop_id
+        description: Primary shop identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: shop_name
+        description: Shop display name.
+      - name: city
+        description: City containing the shop.
+      - name: shop_region
+        description: Normalized shop region.
+      - name: opened_at
+        description: Parsed shop opening date.
