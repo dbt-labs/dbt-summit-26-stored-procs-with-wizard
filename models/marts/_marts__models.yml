@@ -1,0 +1,100 @@
+version: 2
+
+models:
+  - name: fct_order_profitability
+    description: >
+      Order profitability fact, one row per order_id. Declarative dbt replacement
+      for the legacy sp_load_order_profitability stored procedure (temp tables +
+      delete/insert). Joins cleaned orders to item and payment rollups (order
+      grain), current membership (customer grain), and the customer and shop
+      dimensions, then derives net revenue, payment_state, and the home-region
+      loyalty flag. Materialized as a table to mirror the legacy full-replacement
+      load. Legacy null behavior for missing item/payment rollups is preserved:
+      orders without items or payments carry NULL measures rather than 0.
+    columns:
+      - name: order_id
+        description: Order identifier. Grain of the model.
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Customer who placed the order.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+      - name: customer_name
+        description: Customer display name (from stg_customers.full_name).
+      - name: customer_email
+        description: Normalized customer email.
+      - name: home_region
+        description: Customer's standardized home region.
+      - name: favored_discipline
+        description: Customer's favored magical discipline.
+      - name: guild_id
+        description: Guild of the customer's current membership (may be null if no membership).
+      - name: guild_tier
+        description: Tier of the customer's current membership (may be null if no membership).
+      - name: shop_id
+        description: Shop where the order was placed.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_shops')
+                field: shop_id
+      - name: shop_name
+        description: Shop name.
+      - name: shop_city
+        description: Shop city (from stg_shops.city).
+      - name: shop_region
+        description: Shop region.
+      - name: ordered_at
+        description: Order timestamp.
+      - name: ordered_date
+        description: Order date (ordered_at cast to date).
+      - name: order_status
+        description: Normalized order status.
+      - name: order_channel
+        description: Normalized order channel.
+      - name: item_quantity
+        description: Total item quantity; NULL when the order has no line items.
+      - name: line_count
+        description: Number of line items; NULL when the order has no line items.
+      - name: distinct_potions
+        description: Distinct potion SKUs; NULL when the order has no line items.
+      - name: gross_revenue_copper
+        description: Gross revenue in copper; NULL when the order has no line items.
+      - name: gross_revenue_gold
+        description: Gross revenue in gold; NULL when the order has no line items.
+      - name: discount_copper
+        description: Order discount in copper.
+      - name: discount_gold
+        description: Order discount in gold.
+      - name: net_revenue_copper
+        description: gross_revenue_copper minus discount_copper; NULL when gross is NULL (no items).
+      - name: net_revenue_gold
+        description: gross_revenue_gold minus discount_gold; NULL when gross is NULL (no items).
+      - name: paid_amount_copper
+        description: Successful paid amount in copper; NULL when the order has no payment attempts.
+      - name: paid_amount_gold
+        description: Successful paid amount in gold; NULL when the order has no payment attempts.
+      - name: latest_paid_at
+        description: Latest payment timestamp across attempts; NULL when no payments.
+      - name: payment_attempt_count
+        description: Count of payment attempts; NULL when the order has no payment attempts.
+      - name: payment_state
+        description: >
+          Derived payment classification: 'paid' if any successful payment,
+          else 'cancelled' if the order status is cancelled/canceled, else 'unpaid'.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['paid', 'cancelled', 'unpaid']
+      - name: is_home_region_order
+        description: True when the customer's home region equals the shop's region.
+      - name: loaded_at
+        description: >
+          Model build timestamp (current_timestamp()). Part of the output contract,
+          but execution-time metadata — it cannot match historical procedure-run
+          values and must be excluded from parity comparisons.

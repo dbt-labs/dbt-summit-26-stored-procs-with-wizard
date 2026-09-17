@@ -1,0 +1,102 @@
+version: 2
+
+models:
+  - name: int_order_item_rollup
+    description: >
+      Order-item aggregate rolled up from stg_order_items to exactly one row per
+      order_id. Provides item quantity, gross revenue in copper and gold, line
+      count, and count of distinct potion SKUs. Numeric behavior mirrors the
+      legacy procedure (gold derived by dividing by 100 inside the sum) so a
+      parity comparison can be completed before any precision migration.
+    columns:
+      - name: order_id
+        description: Order identifier. Grain of the model.
+        data_tests:
+          - not_null
+          - unique
+      - name: item_quantity
+        description: Total item quantity across all line items on the order.
+      - name: gross_revenue_copper
+        description: Gross revenue in copper coins (sum of quantity * unit_price_copper).
+      - name: gross_revenue_gold
+        description: Gross revenue in gold (sum of (quantity * unit_price_copper) / 100).
+      - name: line_count
+        description: Number of order line items on the order.
+      - name: distinct_potions
+        description: Count of distinct potion SKUs on the order.
+
+  - name: int_payments_rollup
+    description: >
+      Payment aggregate rolled up from stg_payments to exactly one row per
+      order_id, collapsing many payment attempts into a single order-grain
+      record. Paid amounts sum only attempts whose normalized status is
+      'success'; latest_paid_at is the max timestamp across all attempts. Payment
+      state classification is intentionally left to the fact model. Numeric
+      behavior mirrors the legacy procedure so parity can be verified before any
+      precision migration.
+    columns:
+      - name: order_id
+        description: Order identifier. Grain of the model.
+        data_tests:
+          - not_null
+          - unique
+      - name: paid_amount_copper
+        description: Sum of successful payment amounts in copper coins (non-success attempts contribute 0).
+      - name: paid_amount_gold
+        description: Sum of successful payment amounts in gold (copper / 100; non-success attempts contribute 0).
+      - name: latest_paid_at
+        description: Latest parsed paid_at timestamp across all attempts on the order.
+      - name: has_successful_payment
+        description: 1 if the order has at least one successful payment, else 0.
+      - name: payment_attempt_count
+        description: Count of all payment attempts on the order, regardless of status.
+
+  - name: int_memberships_current
+    description: >
+      Current guild membership per customer, one row per customer_id. Deduplicates
+      the membership interval history from stg_guild_memberships by selecting the
+      single "most current" record with row_number(), ordered by valid_to
+      descending (open-ended memberships treated as 2999-12-31), then valid_from
+      descending, then membership_id descending as a deterministic tie-break.
+
+      NOTE: This is current-membership semantics — every order joins to the
+      customer's latest membership, not the membership that was valid at the time
+      of the order. This preserves the legacy procedure exactly. An as-of-order
+      (temporal) join is a deliberate future business change, not a bug.
+    columns:
+      - name: customer_id
+        description: Customer identifier. Grain of the model.
+        data_tests:
+          - not_null
+          - unique
+      - name: guild_id
+        description: Guild of the customer's current membership.
+      - name: guild_tier
+        description: Tier of the customer's current membership.
+      - name: valid_from
+        description: Start date of the current membership.
+      - name: valid_to
+        description: End date of the current membership; null for an open-ended (still active) membership.
+
+unit_tests:
+  - name: test_memberships_current_tiebreak
+    model: int_memberships_current
+    description: >
+      Proves the current-membership selection rule. C1 confirms an open-ended
+      membership (null valid_to) wins over a closed one with a later valid_from,
+      because null is treated as 2999-12-31. C2 confirms that when valid_to and
+      valid_from tie, the highest membership_id wins deterministically.
+    given:
+      - input: ref('stg_guild_memberships')
+        rows:
+          # C1: open-ended membership should beat the more recently started closed one
+          - {membership_id: 1, customer_id: C1, guild_id: G_CLOSED, guild_tier: silver, valid_from: "2021-01-01", valid_to: "2022-01-01"}
+          - {membership_id: 2, customer_id: C1, guild_id: G_OPEN, guild_tier: gold, valid_from: "2019-01-01", valid_to: null}
+          # C2: identical dates, tie broken by highest membership_id
+          - {membership_id: 10, customer_id: C2, guild_id: G_LOW, guild_tier: bronze, valid_from: "2022-01-01", valid_to: "2023-01-01"}
+          - {membership_id: 11, customer_id: C2, guild_id: G_HIGH, guild_tier: silver, valid_from: "2022-01-01", valid_to: "2023-01-01"}
+    expect:
+      rows:
+        - {customer_id: C1, guild_id: G_OPEN, guild_tier: gold, valid_from: "2019-01-01", valid_to: null}
+        - {customer_id: C2, guild_id: G_HIGH, guild_tier: silver, valid_from: "2022-01-01", valid_to: "2023-01-01"}
+

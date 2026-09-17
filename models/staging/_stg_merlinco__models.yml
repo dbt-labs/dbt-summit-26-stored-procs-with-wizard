@@ -1,0 +1,139 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: >
+      Cleaned order headers, one row per order. Casts ordered_at, normalizes
+      status and channel, and derives discount in copper and gold. Orders with a
+      null order_id are dropped, matching the legacy procedure.
+    columns:
+      - name: order_id
+        description: Primary order identifier. Grain of the model.
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Customer who placed the order.
+      - name: shop_id
+        description: Shop where the order was placed.
+      - name: ordered_at
+        description: Order timestamp, cast to timestamp_ntz.
+      - name: order_status
+        description: Lowercased, trimmed order status.
+      - name: order_channel
+        description: Lowercased, trimmed order channel.
+      - name: discount_copper
+        description: Order discount in copper coins; null coalesced to 0.
+      - name: discount_gold
+        description: Order discount in gold (copper / 100).
+
+  - name: stg_order_items
+    description: >
+      Cleaned order line items, one row per order line item (source grain
+      preserved). Quantity and unit price are cast to numeric with nulls
+      coalesced to 0; rollups happen downstream.
+    columns:
+      - name: order_item_id
+        description: Primary order-item identifier. Grain of the model.
+        data_tests:
+          - not_null
+          - unique
+      - name: order_id
+        description: Order this line item belongs to.
+        data_tests:
+          - not_null
+      - name: potion_sku
+        description: Potion SKU sold on this line.
+      - name: quantity
+        description: Ordered quantity; null coalesced to 0.
+      - name: unit_price_copper
+        description: Unit price in copper coins; null coalesced to 0.
+
+  - name: stg_payments
+    description: >
+      Cleaned payment attempts, one row per attempt (source grain preserved).
+      Status is normalized and amount cast to numeric; success filtering and
+      rollups happen downstream.
+    columns:
+      - name: payment_id
+        description: Primary payment identifier. Grain of the model.
+        data_tests:
+          - not_null
+          - unique
+      - name: order_id
+        description: Order this payment attempt is against.
+        data_tests:
+          - not_null
+      - name: method
+        description: Payment method.
+      - name: payment_status
+        description: Lowercased, trimmed payment status.
+      - name: amount_copper
+        description: Payment amount in copper coins; null coalesced to 0.
+      - name: paid_at
+        description: Payment timestamp, cast to timestamp_ntz.
+
+  - name: stg_customers
+    description: >
+      Cleaned customer records, one row per customer. Normalizes email casing,
+      standardizes home_region (NR maps to Northern Reaches), and parses signup
+      date, birth year, and favored discipline.
+    columns:
+      - name: customer_id
+        description: Primary customer identifier. Grain of the model.
+        data_tests:
+          - not_null
+          - unique
+      - name: full_name
+        description: Customer display name.
+      - name: email
+        description: Lowercased, trimmed customer email.
+      - name: home_region
+        description: Standardized home region; NR expands to Northern Reaches.
+      - name: signed_up_at
+        description: Signup date, cast to date.
+      - name: birth_year
+        description: Birth year, cast to numeric.
+      - name: favored_discipline
+        description: Initcapped favored magical discipline.
+
+  - name: stg_guild_memberships
+    description: >
+      Cleaned guild membership intervals, one row per membership interval
+      (source grain preserved — no deduplication here). Retains membership_id for
+      deterministic current-record tie-breaking downstream.
+    columns:
+      - name: membership_id
+        description: Primary membership identifier. Grain of the model; retained for tie-breaking.
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Customer the membership belongs to.
+      - name: guild_id
+        description: Guild the customer is a member of.
+      - name: guild_tier
+        description: Lowercased, trimmed membership tier.
+      - name: valid_from
+        description: Membership start date, cast to date.
+      - name: valid_to
+        description: Membership end date, cast to date; empty string coalesced to null (open interval).
+
+  - name: stg_shops
+    description: >
+      Cleaned shop dimension, one row per shop. Standardizes region formatting
+      and parses the opening date.
+    columns:
+      - name: shop_id
+        description: Primary shop identifier. Grain of the model.
+        data_tests:
+          - not_null
+          - unique
+      - name: shop_name
+        description: Shop name.
+      - name: city
+        description: Shop city.
+      - name: shop_region
+        description: Initcapped shop region.
+      - name: opened_at
+        description: Shop opening date, cast to date.
