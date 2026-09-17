@@ -3,7 +3,7 @@
 ## Showing username in workshop 
 
 dbt show --inline "select current_user()" --limit 1
-
+hi
 ## Training Survey (pls fill out :D)
 
 https://dbtlearn.typeform.com/dbt-summit-labs
