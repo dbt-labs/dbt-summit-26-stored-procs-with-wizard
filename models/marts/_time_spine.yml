@@ -1,0 +1,14 @@
+version: 2
+
+models:
+  - name: time_spine_daily
+    description: >
+      Daily time spine with one row per day, spanning roughly 5 years back to 30
+      days ahead. Required by the dbt Semantic Layer / MetricFlow for time-based
+      dimensions and any future time-window or cumulative metrics.
+    time_spine:
+      standard_granularity_column: date_day
+    columns:
+      - name: date_day
+        description: The base date column at daily granularity.
+        granularity: day

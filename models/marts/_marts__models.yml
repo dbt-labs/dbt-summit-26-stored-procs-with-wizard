@@ -11,14 +11,23 @@ models:
       loyalty flag. Materialized as a table to mirror the legacy full-replacement
       load. Legacy null behavior for missing item/payment rollups is preserved:
       orders without items or payments carry NULL measures rather than 0.
+    semantic_model:
+      enabled: true
+    agg_time_dimension: ordered_date
     columns:
       - name: order_id
         description: Order identifier. Grain of the model.
+        entity:
+          type: primary
+          name: order_id
         data_tests:
           - not_null
           - unique
       - name: customer_id
         description: Customer who placed the order.
+        entity:
+          type: foreign
+          name: customer
         data_tests:
           - relationships:
               arguments:
@@ -30,14 +39,23 @@ models:
         description: Normalized customer email.
       - name: home_region
         description: Customer's standardized home region.
+        dimension:
+          type: categorical
       - name: favored_discipline
         description: Customer's favored magical discipline.
+        dimension:
+          type: categorical
       - name: guild_id
         description: Guild of the customer's current membership (may be null if no membership).
       - name: guild_tier
         description: Tier of the customer's current membership (may be null if no membership).
+        dimension:
+          type: categorical
       - name: shop_id
         description: Shop where the order was placed.
+        entity:
+          type: foreign
+          name: shop
         data_tests:
           - relationships:
               arguments:
@@ -49,14 +67,23 @@ models:
         description: Shop city (from stg_shops.city).
       - name: shop_region
         description: Shop region.
+        dimension:
+          type: categorical
       - name: ordered_at
         description: Order timestamp.
       - name: ordered_date
-        description: Order date (ordered_at cast to date).
+        description: Order date (ordered_at cast to date). Default day-grain time dimension.
+        granularity: day
+        dimension:
+          type: time
       - name: order_status
         description: Normalized order status.
+        dimension:
+          type: categorical
       - name: order_channel
         description: Normalized order channel.
+        dimension:
+          type: categorical
       - name: item_quantity
         description: Total item quantity; NULL when the order has no line items.
       - name: line_count
@@ -87,6 +114,8 @@ models:
         description: >
           Derived payment classification: 'paid' if any successful payment,
           else 'cancelled' if the order status is cancelled/canceled, else 'unpaid'.
+        dimension:
+          type: categorical
         data_tests:
           - accepted_values:
               arguments:
@@ -98,3 +127,53 @@ models:
           Model build timestamp (current_timestamp()). Part of the output contract,
           but execution-time metadata — it cannot match historical procedure-run
           values and must be excluded from parity comparisons.
+    metrics:
+      # Business definitions expose the validated order-grain measures of the
+      # fact. Gold metrics use sum(); SQL sum ignores the NULLs that orders
+      # without items/payments legitimately carry, preserving legacy semantics.
+      # Ratio/percentage and cumulative metrics are intentionally deferred until
+      # their numerator/denominator, time spine, and null/refund treatment are
+      # agreed with the business.
+      - name: order_count
+        description: Number of orders (one row per order_id).
+        label: Order Count
+        type: simple
+        agg: count
+        expr: 1
+      - name: gross_revenue_gold
+        description: Total gross revenue in gold before discounts.
+        label: Gross Revenue (Gold)
+        type: simple
+        agg: sum
+        expr: gross_revenue_gold
+      - name: discount_gold
+        description: Total order discounts in gold.
+        label: Discount (Gold)
+        type: simple
+        agg: sum
+        expr: discount_gold
+      - name: net_revenue_gold
+        description: Total net revenue in gold (gross revenue minus discount).
+        label: Net Revenue (Gold)
+        type: simple
+        agg: sum
+        expr: net_revenue_gold
+      - name: paid_amount_gold
+        description: Total successfully paid amount in gold.
+        label: Paid Amount (Gold)
+        type: simple
+        agg: sum
+        expr: paid_amount_gold
+      - name: item_quantity
+        description: Total item quantity across orders.
+        label: Item Quantity
+        type: simple
+        agg: sum
+        expr: item_quantity
+      - name: distinct_potions
+        description: Sum of per-order distinct potion SKU counts.
+        label: Distinct Potions
+        type: simple
+        agg: sum
+        expr: distinct_potions
+
