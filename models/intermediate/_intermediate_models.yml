@@ -1,0 +1,29 @@
+version: 2
+
+models:
+  - name: int_order_items_aggregated
+    description: Order line items aggregated to one row per order.
+    columns:
+      - name: order_id
+        description: Primary grain key for the order item rollup.
+        data_tests:
+          - not_null
+          - unique
+
+  - name: int_payments_aggregated
+    description: Payment attempts aggregated to one row per order, including successful amounts and attempt counts.
+    columns:
+      - name: order_id
+        description: Primary grain key for the payment rollup.
+        data_tests:
+          - not_null
+          - unique
+
+  - name: int_current_guild_memberships
+    description: Most recent guild membership for each customer using membership end date, start date, and identifier as tie-breakers.
+    columns:
+      - name: customer_id
+        description: Primary grain key for current customer membership.
+        data_tests:
+          - not_null
+          - unique

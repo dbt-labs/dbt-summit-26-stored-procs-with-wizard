@@ -1,0 +1,68 @@
+version: 2
+
+models:
+  - name: stg_merlinco__orders
+    description: Cleaned order headers with normalized status, channel, timestamps, and currency values.
+    columns:
+      - name: order_id
+        description: Primary order identifier.
+        data_tests:
+          - not_null
+          - unique
+
+  - name: stg_merlinco__order_items
+    description: Cleaned order line items with numeric quantities and unit prices.
+    columns:
+      - name: order_item_id
+        description: Primary order line identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: order_id
+        description: Order identifier shared by all lines on an order.
+        data_tests:
+          - not_null
+
+  - name: stg_merlinco__payments
+    description: Cleaned payment attempts with normalized status, method, timestamp, and amount.
+    columns:
+      - name: payment_id
+        description: Primary payment attempt identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: order_id
+        description: Order associated with the payment attempt.
+        data_tests:
+          - not_null
+
+  - name: stg_merlinco__guild_memberships
+    description: Cleaned customer guild membership history.
+    columns:
+      - name: membership_id
+        description: Primary guild membership identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Customer associated with the membership.
+        data_tests:
+          - not_null
+
+  - name: stg_merlinco__customers
+    description: Cleaned customers with normalized contact, region, date, and discipline attributes.
+    columns:
+      - name: customer_id
+        description: Primary customer identifier.
+        data_tests:
+          - not_null
+          - unique
+
+  - name: stg_merlinco__shops
+    description: Cleaned shop locations with normalized region and opening date.
+    columns:
+      - name: shop_id
+        description: Primary shop identifier.
+        data_tests:
+          - not_null
+          - unique

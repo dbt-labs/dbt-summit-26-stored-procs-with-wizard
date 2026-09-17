@@ -1,0 +1,81 @@
+version: 2
+
+models:
+  - name: fct_order_profitability
+    description: One row per order combining customer, shop, guild, item revenue, discounts, and payment outcomes.
+    columns:
+      - name: order_id
+        description: Primary order identifier and fact grain.
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Customer who placed the order.
+        data_tests:
+          - not_null
+      - name: customer_name
+        description: Customer name at the time the model was built.
+      - name: customer_email
+        description: Normalized customer email address.
+      - name: home_region
+        description: Normalized customer home region.
+      - name: favored_discipline
+        description: Customer's favored magical discipline.
+      - name: guild_id
+        description: Customer's current guild identifier, when available.
+      - name: guild_tier
+        description: Customer's current normalized guild tier, when available.
+      - name: shop_id
+        description: Shop associated with the order.
+        data_tests:
+          - not_null
+      - name: shop_name
+        description: Name of the order's shop.
+      - name: shop_city
+        description: City of the order's shop.
+      - name: shop_region
+        description: Normalized region of the order's shop.
+      - name: ordered_at
+        description: Order timestamp converted from the raw value.
+      - name: ordered_date
+        description: Calendar date of the order.
+      - name: order_status
+        description: Normalized operational order status.
+      - name: order_channel
+        description: Normalized channel through which the order was placed.
+      - name: item_quantity
+        description: Total item quantity across the order's lines.
+      - name: line_count
+        description: Number of order lines.
+      - name: distinct_potions
+        description: Number of distinct potion SKUs on the order.
+      - name: gross_revenue_copper
+        description: Gross line revenue before discounts, in copper coins.
+      - name: gross_revenue_gold
+        description: Gross line revenue before discounts, converted to gold coins.
+      - name: discount_copper
+        description: Order-level discount in copper coins.
+      - name: discount_gold
+        description: Order-level discount converted to gold coins.
+      - name: net_revenue_copper
+        description: Gross revenue less the order discount, in copper coins.
+      - name: net_revenue_gold
+        description: Gross revenue less the order discount, in gold coins.
+      - name: paid_amount_copper
+        description: Total successful payment amount in copper coins.
+      - name: paid_amount_gold
+        description: Total successful payment amount in gold coins.
+      - name: latest_paid_at
+        description: Latest timestamp across all payment attempts for the order.
+      - name: payment_attempt_count
+        description: Number of payment attempts for the order.
+      - name: payment_state
+        description: Derived payment state of paid, cancelled, or unpaid.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['paid', 'cancelled', 'unpaid']
+      - name: is_home_region_order
+        description: True when the customer's home region matches the shop region.
+      - name: loaded_at
+        description: Timestamp when dbt built the fact table.
