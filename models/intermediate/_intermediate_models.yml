@@ -1,0 +1,65 @@
+version: 2
+
+models:
+  - name: int_order_item_rollup
+    description: Order-item measures aggregated to one row per order.
+    columns:
+      - name: order_id
+        description: Order identifier and grain of the model.
+        data_tests:
+          - not_null
+          - unique
+      - name: item_quantity
+        description: Total ordered quantity, with null quantities contributing zero.
+      - name: gross_revenue_cents
+        description: Total item revenue in cents before discounts.
+      - name: gross_revenue_dollars
+        description: Total item revenue in dollars, calculated as gross-revenue cents divided by 100.0.
+      - name: line_count
+        description: Number of source order-item records for the order.
+      - name: distinct_potions
+        description: Number of distinct non-null potion SKUs on the order.
+
+  - name: int_payments_rollup
+    description: Payment-attempt measures aggregated to one row per order.
+    columns:
+      - name: order_id
+        description: Order identifier and grain of the model.
+        data_tests:
+          - not_null
+          - unique
+      - name: paid_amount_cents
+        description: Total successful payment amount in cents.
+      - name: paid_amount_dollars
+        description: Total successful payment amount in dollars, calculated as paid-amount cents divided by 100.0.
+      - name: latest_paid_at
+        description: Latest timestamp across all payment attempts for the order.
+      - name: has_successful_payment
+        description: Integer flag equal to 1 when the order has at least one successful payment, otherwise 0.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+      - name: payment_attempt_count
+        description: Number of source payment-attempt records for the order.
+
+  - name: int_memberships_current
+    description: Current guild membership selected at one row per customer using the legacy tie-break rule.
+    columns:
+      - name: membership_id
+        description: Identifier of the selected guild membership record.
+        data_tests:
+          - not_null
+      - name: customer_id
+        description: Customer identifier and grain of the model.
+        data_tests:
+          - not_null
+          - unique
+      - name: guild_id
+        description: Guild identifier from the selected membership.
+      - name: guild_tier
+        description: Normalized guild tier from the selected membership.
+      - name: valid_from
+        description: Start date of the selected membership.
+      - name: valid_to
+        description: End date of the selected membership, or null when open-ended.

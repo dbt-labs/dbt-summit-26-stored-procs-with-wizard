@@ -1,0 +1,67 @@
+version: 2
+
+models:
+  - name: fct_orders
+    description: Order profitability fact table at one row per order, with customer, shop, membership, item, and payment context.
+    columns:
+      - name: order_id
+        description: Order identifier and grain of the model.
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Customer identifier associated with the order.
+      - name: customer_name
+        description: Customer display name at model build time.
+      - name: customer_email
+        description: Normalized customer email address at model build time.
+      - name: home_region
+        description: Normalized customer home region.
+      - name: favored_discipline
+        description: Customer favored discipline.
+      - name: guild_id
+        description: Guild identifier from the customer's currently selected membership.
+      - name: guild_tier
+        description: Guild tier from the customer's currently selected membership.
+      - name: shop_id
+        description: Shop identifier associated with the order.
+      - name: shop_name
+        description: Shop name.
+      - name: shop_city
+        description: City containing the shop.
+      - name: shop_region
+        description: Normalized shop region.
+      - name: ordered_at
+        description: Timestamp when the order was placed.
+      - name: ordered_date
+        description: Calendar date when the order was placed.
+      - name: order_status
+        description: Normalized order status.
+      - name: order_channel
+        description: Normalized channel through which the order was placed.
+      - name: item_quantity
+        description: Total item quantity on the order.
+      - name: line_count
+        description: Number of order-item records on the order.
+      - name: distinct_potions
+        description: Number of distinct potion SKUs on the order.
+      - name: gross_revenue
+        description: Gross item revenue in dollars before discounts.
+      - name: discount
+        description: Order discount in dollars, with missing or invalid source discounts treated as zero.
+      - name: net_revenue
+        description: Gross revenue minus the order discount, in dollars.
+      - name: paid_amount
+        description: Total successful payment amount in dollars; null when the order has no payment attempts.
+      - name: latest_paid_at
+        description: Latest timestamp across all payment attempts for the order.
+      - name: payment_attempt_count
+        description: Number of payment attempts for the order; null when there are no attempts.
+      - name: payment_state
+        description: Payment classification derived from successful attempts and cancellation status.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['paid', 'cancelled', 'unpaid']
+      - name: is_home_region_order
+        description: True when the normalized customer home region matches the normalized shop region.
