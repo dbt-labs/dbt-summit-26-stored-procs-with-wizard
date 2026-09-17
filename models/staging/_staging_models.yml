@@ -1,0 +1,122 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: Cleaned order headers at one row per source order record.
+    columns:
+      - name: order_id
+        description: Order identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Customer identifier.
+      - name: shop_id
+        description: Shop identifier.
+      - name: ordered_at
+        description: Order timestamp parsed as a timestamp without a time zone.
+      - name: order_status
+        description: Lowercased and trimmed order status.
+      - name: order_channel
+        description: Lowercased and trimmed order channel.
+      - name: discount_cents
+        description: Order discount cast to a numeric value in cents.
+      - name: discount_dollars
+        description: Order discount in dollars, calculated as discount cents divided by 100.0.
+
+  - name: stg_order_items
+    description: Cleaned order line items at one row per source order-item record.
+    columns:
+      - name: order_item_id
+        description: Order-item identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: order_id
+        description: Order identifier.
+      - name: potion_sku
+        description: Potion SKU.
+      - name: quantity
+        description: Ordered quantity cast to a numeric value.
+      - name: unit_price_cents
+        description: Unit price cast to a numeric value in cents.
+      - name: unit_price_dollars
+        description: Unit price in dollars, calculated as unit-price cents divided by 100.0.
+
+  - name: stg_payments
+    description: Cleaned payment attempts at one row per source payment record.
+    columns:
+      - name: payment_id
+        description: Payment-attempt identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: order_id
+        description: Order identifier.
+      - name: payment_method
+        description: Lowercased and trimmed payment method.
+      - name: amount_cents
+        description: Payment amount cast to a numeric value in cents.
+      - name: amount_dollars
+        description: Payment amount in dollars, calculated as amount cents divided by 100.0.
+      - name: payment_status
+        description: Lowercased and trimmed payment status.
+      - name: paid_at
+        description: Payment timestamp parsed as a timestamp without a time zone.
+
+  - name: stg_customers
+    description: Cleaned customers at one row per source customer record.
+    columns:
+      - name: customer_id
+        description: Customer identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: full_name
+        description: Trimmed customer display name.
+      - name: email
+        description: Lowercased and trimmed customer email address.
+      - name: home_region
+        description: Uppercased and trimmed home-region code or name.
+      - name: signed_up_at
+        description: Customer signup value parsed as a date.
+      - name: birth_year
+        description: Customer birth year cast to a numeric value.
+      - name: favored_discipline
+        description: Trimmed customer discipline in title case.
+
+  - name: stg_guild_memberships
+    description: Cleaned guild membership history at one row per source membership record.
+    columns:
+      - name: membership_id
+        description: Guild membership identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Customer identifier.
+      - name: guild_id
+        description: Guild identifier.
+      - name: guild_tier
+        description: Lowercased and trimmed guild tier.
+      - name: valid_from
+        description: Membership start value parsed as a date.
+      - name: valid_to
+        description: Membership end value parsed as a date, with blank strings represented as null.
+
+  - name: stg_shops
+    description: Cleaned shops at one row per source shop record.
+    columns:
+      - name: shop_id
+        description: Shop identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: shop_name
+        description: Trimmed shop name.
+      - name: city
+        description: Trimmed shop city.
+      - name: shop_region
+        description: Uppercased and trimmed shop region.
+      - name: opened_at
+        description: Shop opening value parsed as a date.
