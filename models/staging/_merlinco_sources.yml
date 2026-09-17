@@ -8,7 +8,7 @@ sources:
     tables:
       - name: RAW_CUSTOMERS
         identifier: RAW_CUSTOMERS
-        description: Raw customer records.
+        description: One raw customer record per customer identifier.
         columns:
           - name: CUSTOMER_ID
             description: Primary customer identifier.
@@ -29,7 +29,7 @@ sources:
             description: Customer favored magical discipline.
       - name: RAW_SHOPS
         identifier: RAW_SHOPS
-        description: Raw shop locations.
+        description: One raw shop record per shop identifier.
         columns:
           - name: SHOP_ID
             description: Primary shop identifier.
@@ -123,7 +123,7 @@ sources:
             description: Recipe unit.
       - name: RAW_ORDERS
         identifier: RAW_ORDERS
-        description: Raw order headers.
+        description: One raw order header per order identifier.
         columns:
           - name: ORDER_ID
             description: Primary order identifier.
@@ -144,7 +144,7 @@ sources:
             description: Order discount in copper coins as text.
       - name: RAW_ORDER_ITEMS
         identifier: RAW_ORDER_ITEMS
-        description: Raw order line items.
+        description: One raw line-item record per order item identifier.
         columns:
           - name: ORDER_ITEM_ID
             description: Primary order item identifier.
@@ -161,7 +161,7 @@ sources:
             description: Unit price in copper coins as text.
       - name: RAW_PAYMENTS
         identifier: RAW_PAYMENTS
-        description: Raw payment attempts.
+        description: One raw payment-attempt record per payment identifier.
         columns:
           - name: PAYMENT_ID
             description: Primary payment identifier.
@@ -193,7 +193,7 @@ sources:
             description: Guild founded year as text.
       - name: RAW_GUILD_MEMBERSHIPS
         identifier: RAW_GUILD_MEMBERSHIPS
-        description: Raw customer guild membership intervals.
+        description: One raw membership interval per membership identifier.
         columns:
           - name: MEMBERSHIP_ID
             description: Primary membership identifier.
