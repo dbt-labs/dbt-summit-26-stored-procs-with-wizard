@@ -1,0 +1,135 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: Cleaned order headers at one row per order_id.
+    columns:
+      - name: order_id
+        description: Primary order identifier.
+        data_tests: [not_null, unique]
+      - name: customer_id
+        description: Customer that placed the order.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+      - name: shop_id
+        description: Shop that fulfilled the order.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_shops')
+                field: shop_id
+      - name: ordered_at
+        description: Order timestamp parsed as a timestamp without timezone.
+      - name: order_status
+        description: Lowercase, trimmed order status.
+      - name: order_channel
+        description: Lowercase, trimmed order channel.
+      - name: discount_copper
+        description: Order discount in copper coins, defaulting invalid or null values to zero.
+      - name: discount_gold
+        description: Order discount converted to gold coins at 100 copper per gold.
+
+  - name: stg_order_items
+    description: Cleaned order lines at one row per order_item_id.
+    columns:
+      - name: order_item_id
+        description: Primary order-line identifier.
+        data_tests: [not_null, unique]
+      - name: order_id
+        description: Order containing the line.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+      - name: potion_sku
+        description: Potion sold on the line.
+      - name: quantity
+        description: Numeric quantity, defaulting invalid or null values to zero.
+      - name: unit_price_copper
+        description: Unit price in copper coins, defaulting invalid or null values to zero.
+      - name: unit_price_gold
+        description: Unit price converted to gold coins at 100 copper per gold.
+
+  - name: stg_payments
+    description: Cleaned payment attempts at one row per payment_id.
+    columns:
+      - name: payment_id
+        description: Primary payment-attempt identifier.
+        data_tests: [not_null, unique]
+      - name: order_id
+        description: Order associated with the payment attempt.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+      - name: payment_method
+        description: Lowercase, trimmed payment method.
+      - name: amount_copper
+        description: Attempted payment amount in copper coins.
+      - name: amount_gold
+        description: Attempted payment amount converted to gold coins.
+      - name: payment_status
+        description: Lowercase, trimmed payment status.
+      - name: paid_at
+        description: Payment-attempt timestamp parsed without timezone.
+
+  - name: stg_customers
+    description: Cleaned customer records at one row per customer_id.
+    columns:
+      - name: customer_id
+        description: Primary customer identifier.
+        data_tests: [not_null, unique]
+      - name: full_name
+        description: Customer display name.
+      - name: email
+        description: Lowercase, trimmed customer email.
+      - name: home_region
+        description: Standardized customer home region.
+      - name: signed_up_at
+        description: Customer signup date.
+      - name: birth_year
+        description: Customer birth year parsed as a number.
+      - name: favored_discipline
+        description: Standardized favored discipline.
+
+  - name: stg_guild_memberships
+    description: Cleaned guild membership history at one row per membership_id.
+    columns:
+      - name: membership_id
+        description: Primary membership identifier.
+        data_tests: [not_null, unique]
+      - name: customer_id
+        description: Customer associated with the membership.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+      - name: guild_id
+        description: Guild associated with the membership.
+      - name: guild_tier
+        description: Lowercase, trimmed membership tier.
+      - name: valid_from
+        description: Membership validity start date.
+      - name: valid_to
+        description: Membership validity end date; null represents an open interval.
+
+  - name: stg_shops
+    description: Cleaned shop records at one row per shop_id.
+    columns:
+      - name: shop_id
+        description: Primary shop identifier.
+        data_tests: [not_null, unique]
+      - name: shop_name
+        description: Shop name.
+      - name: city
+        description: City where the shop operates.
+      - name: shop_region
+        description: Standardized shop region.
+      - name: opened_at
+        description: Shop opening date.
