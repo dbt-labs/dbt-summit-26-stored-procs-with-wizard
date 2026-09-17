@@ -1,0 +1,252 @@
+version: 2
+
+models:
+  - name: stg_merlinco__orders
+    description: Cleaned order headers at one row per order. Filters null order identifiers and normalizes timestamps, status, channel, and discount amounts.
+    columns:
+      - name: order_id
+        description: Primary order identifier.
+        data_tests: [not_null, unique]
+      - name: customer_id
+        description: Customer that placed the order.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_merlinco__customers')
+                field: customer_id
+      - name: shop_id
+        description: Shop fulfilling the order.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_merlinco__shops')
+                field: shop_id
+      - name: ordered_at
+        description: Order timestamp parsed as a timezone-neutral timestamp.
+      - name: order_status
+        description: Lowercase, trimmed order status.
+      - name: order_channel
+        description: Lowercase, trimmed order channel.
+      - name: discount_copper
+        description: Order discount in copper coins; missing or invalid values are zero.
+      - name: discount_gold
+        description: Order discount converted from copper to gold at 100 copper per gold.
+
+  - name: stg_merlinco__order_items
+    description: Cleaned order line items at one row per order item.
+    columns:
+      - name: order_item_id
+        description: Primary order item identifier.
+        data_tests: [not_null, unique]
+      - name: order_id
+        description: Order containing the line item.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_merlinco__orders')
+                field: order_id
+      - name: potion_sku
+        description: Potion sold on the line.
+      - name: quantity
+        description: Numeric quantity; missing or invalid values are zero.
+      - name: unit_price_copper
+        description: Numeric unit price in copper coins; missing or invalid values are zero.
+
+  - name: stg_merlinco__payments
+    description: Cleaned payment attempts at one row per payment attempt.
+    columns:
+      - name: payment_id
+        description: Primary payment identifier.
+        data_tests: [not_null, unique]
+      - name: order_id
+        description: Order associated with the payment attempt.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_merlinco__orders')
+                field: order_id
+      - name: payment_method
+        description: Method used for the payment attempt.
+      - name: amount_copper
+        description: Payment amount in copper coins; missing or invalid values are zero.
+      - name: payment_status
+        description: Lowercase, trimmed payment status.
+      - name: paid_at
+        description: Payment attempt timestamp parsed as a timezone-neutral timestamp.
+
+  - name: stg_merlinco__guild_memberships
+    description: Cleaned guild membership history at one row per membership interval.
+    columns:
+      - name: membership_id
+        description: Primary membership interval identifier.
+        data_tests: [not_null, unique]
+      - name: customer_id
+        description: Customer holding the membership.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_merlinco__customers')
+                field: customer_id
+      - name: guild_id
+        description: Guild associated with the membership.
+      - name: guild_tier
+        description: Lowercase, trimmed membership tier.
+      - name: valid_from
+        description: Membership interval start date.
+      - name: valid_to
+        description: Membership interval end date; null represents an open-ended interval.
+
+  - name: stg_merlinco__customers
+    description: Cleaned customer records at one row per customer.
+    columns:
+      - name: customer_id
+        description: Primary customer identifier.
+        data_tests: [not_null, unique]
+      - name: full_name
+        description: Customer display name.
+      - name: email
+        description: Lowercase, trimmed customer email.
+      - name: home_region
+        description: Standardized customer home region, including expansion of the NR code.
+      - name: signed_up_at
+        description: Customer signup date.
+      - name: birth_year
+        description: Numeric customer birth year.
+      - name: favored_discipline
+        description: Title-cased favored magical discipline.
+
+  - name: stg_merlinco__shops
+    description: Cleaned shop records at one row per shop.
+    columns:
+      - name: shop_id
+        description: Primary shop identifier.
+        data_tests: [not_null, unique]
+      - name: shop_name
+        description: Shop name.
+      - name: city
+        description: Shop city.
+      - name: shop_region
+        description: Title-cased shop region.
+      - name: opened_at
+        description: Shop opening date.
+
+  - name: int_order_items_aggregated
+    description: Order item measures rolled up to one row per order.
+    columns:
+      - name: order_id
+        description: Primary order identifier for the rollup.
+        data_tests: [not_null, unique]
+      - name: item_quantity
+        description: Total units across the order's line items.
+      - name: gross_revenue_copper
+        description: Sum of quantity multiplied by unit price in copper coins.
+      - name: gross_revenue_gold
+        description: Gross revenue converted to gold at 100 copper per gold.
+      - name: line_count
+        description: Number of order item rows.
+      - name: distinct_potions
+        description: Number of distinct potion SKUs in the order.
+
+  - name: int_payments_aggregated
+    description: Payment attempts rolled up to one row per order. Paid amounts include successful attempts only; latest_paid_at considers every attempt to preserve the legacy procedure behavior.
+    columns:
+      - name: order_id
+        description: Primary order identifier for the rollup.
+        data_tests: [not_null, unique]
+      - name: paid_amount_copper
+        description: Sum of successful payment amounts in copper coins.
+      - name: paid_amount_gold
+        description: Sum of successful payment amounts converted to gold.
+      - name: latest_paid_at
+        description: Latest timestamp across all payment attempts, regardless of status.
+      - name: has_successful_payment
+        description: Integer flag indicating whether any successful payment exists.
+      - name: payment_attempt_count
+        description: Number of payment attempts for the order.
+
+  - name: int_customers_current_guild_membership
+    description: One selected guild membership per customer using the legacy procedure's ordering of open-ended intervals, latest end date, latest start date, and highest membership identifier.
+    columns:
+      - name: customer_id
+        description: Primary customer identifier for the selected membership.
+        data_tests: [not_null, unique]
+      - name: guild_id
+        description: Guild from the selected membership.
+      - name: guild_tier
+        description: Tier from the selected membership.
+      - name: valid_from
+        description: Start date of the selected membership interval.
+      - name: valid_to
+        description: End date of the selected membership interval.
+
+  - name: fct_order_profitability
+    description: Order-grain profitability fact migrated from sp_load_order_profitability. Combines order, item, payment, customer, guild membership, and shop attributes.
+    columns:
+      - name: order_id
+        description: Primary key; one row per order.
+        data_tests: [not_null, unique]
+      - name: customer_id
+        description: Customer that placed the order.
+      - name: customer_name
+        description: Customer display name at build time.
+      - name: customer_email
+        description: Normalized customer email at build time.
+      - name: home_region
+        description: Standardized customer home region.
+      - name: favored_discipline
+        description: Customer's favored magical discipline.
+      - name: guild_id
+        description: Guild from the selected customer membership, when available.
+      - name: guild_tier
+        description: Tier from the selected customer membership, when available.
+      - name: shop_id
+        description: Shop fulfilling the order.
+      - name: shop_name
+        description: Shop name.
+      - name: shop_city
+        description: Shop city.
+      - name: shop_region
+        description: Standardized shop region.
+      - name: ordered_at
+        description: Order timestamp.
+      - name: ordered_date
+        description: Calendar date of the order.
+      - name: order_status
+        description: Normalized order status.
+      - name: order_channel
+        description: Normalized order channel.
+      - name: item_quantity
+        description: Total units ordered.
+      - name: line_count
+        description: Number of order lines.
+      - name: distinct_potions
+        description: Number of distinct potion SKUs ordered.
+      - name: gross_revenue_copper
+        description: Gross line-item revenue in copper coins before discount.
+      - name: gross_revenue_gold
+        description: Gross line-item revenue in gold before discount.
+      - name: discount_copper
+        description: Order discount in copper coins.
+      - name: discount_gold
+        description: Order discount in gold.
+      - name: net_revenue_copper
+        description: Gross revenue less discount in copper coins.
+      - name: net_revenue_gold
+        description: Gross revenue less discount in gold.
+      - name: paid_amount_copper
+        description: Successful payment amount in copper coins; null when no payment attempts exist.
+      - name: paid_amount_gold
+        description: Successful payment amount in gold; null when no payment attempts exist.
+      - name: latest_paid_at
+        description: Latest payment-attempt timestamp.
+      - name: payment_attempt_count
+        description: Number of payment attempts; null when no attempts exist.
+      - name: payment_state
+        description: Derived state of paid, cancelled, or unpaid.
+      - name: is_home_region_order
+        description: Whether the standardized customer and shop regions match.
+      - name: loaded_at
+        description: Timestamp when dbt rebuilt the fact table.
