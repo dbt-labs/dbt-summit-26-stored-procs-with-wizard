@@ -1,0 +1,82 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: Cleaned order headers at one row per order_id, excluding null order identifiers to match the legacy procedure.
+    columns:
+      - name: order_id
+        description: Primary order identifier.
+        data_tests: [not_null, unique]
+      - name: customer_id
+        description: Customer who placed the order.
+      - name: shop_id
+        description: Shop associated with the order.
+      - name: ordered_at
+        description: Parsed order timestamp.
+      - name: order_status
+        description: Trimmed, lowercase order status.
+      - name: order_channel
+        description: Trimmed, lowercase order channel.
+      - name: discount_copper
+        description: Discount in copper, with invalid or null raw values treated as zero.
+      - name: discount_gold
+        description: Discount converted at 100 copper per gold.
+
+  - name: stg_order_items
+    description: Cleaned order line items at one row per order_item_id.
+    columns:
+      - name: order_item_id
+        description: Primary order-item identifier.
+        data_tests: [not_null, unique]
+      - name: order_id
+        description: Order containing the line item.
+      - name: potion_sku
+        description: Potion SKU sold.
+      - name: quantity
+        description: Parsed quantity, with invalid or null values treated as zero.
+      - name: unit_price_copper
+        description: Parsed unit price, with invalid or null values treated as zero.
+
+  - name: stg_payments
+    description: Cleaned payment attempts at one row per payment_id.
+    columns:
+      - name: payment_id
+        description: Primary payment-attempt identifier.
+        data_tests: [not_null, unique]
+      - name: order_id
+        description: Order associated with the attempt.
+      - name: payment_status
+        description: Trimmed, lowercase payment status.
+      - name: paid_at
+        description: Parsed payment-attempt timestamp.
+
+  - name: stg_customers
+    description: Cleaned customers at one row per customer_id.
+    columns:
+      - name: customer_id
+        description: Primary customer identifier.
+        data_tests: [not_null, unique]
+      - name: home_region
+        description: Normalized home region, including NR expanded to Northern Reaches.
+
+  - name: stg_guild_memberships
+    description: Cleaned membership intervals at one row per membership_id, before current-record selection.
+    columns:
+      - name: membership_id
+        description: Primary membership identifier retained for deterministic tie-breaking.
+        data_tests: [not_null, unique]
+      - name: customer_id
+        description: Customer associated with the membership interval.
+      - name: valid_from
+        description: Parsed membership start date.
+      - name: valid_to
+        description: Parsed membership end date; blank values become null.
+
+  - name: stg_shops
+    description: Cleaned shops at one row per shop_id.
+    columns:
+      - name: shop_id
+        description: Primary shop identifier.
+        data_tests: [not_null, unique]
+      - name: shop_region
+        description: Trimmed shop region in title case.

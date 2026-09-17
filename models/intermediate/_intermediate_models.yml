@@ -1,0 +1,67 @@
+version: 2
+
+models:
+  - name: int_order_item_rollup
+    description: Order-item measures aggregated to exactly one row per order_id using legacy numeric behavior.
+    columns:
+      - name: order_id
+        description: Primary order identifier for the item rollup.
+        data_tests: [not_null, unique]
+      - name: item_quantity
+        description: Total parsed item quantity across order lines.
+      - name: gross_revenue_copper
+        description: Sum of quantity multiplied by unit price in copper.
+      - name: gross_revenue_gold
+        description: Line-level gross revenue converted at 100 copper per gold and summed.
+      - name: line_count
+        description: Count of all order-item rows.
+      - name: distinct_potions
+        description: Count of distinct non-null potion SKUs.
+
+  - name: int_payments_rollup
+    description: Payment attempts aggregated to one row per order; only successful attempts contribute to paid amounts.
+    columns:
+      - name: order_id
+        description: Primary order identifier for the payment rollup.
+        data_tests: [not_null, unique]
+      - name: paid_amount_copper
+        description: Total successful payment amount in copper.
+      - name: paid_amount_gold
+        description: Total successful payment amount converted at 100 copper per gold.
+      - name: latest_paid_at
+        description: Latest parsed timestamp across all payment attempts, matching the legacy procedure.
+      - name: has_successful_payment
+        description: Integer flag indicating whether any payment attempt succeeded.
+      - name: payment_attempt_count
+        description: Count of all payment attempts.
+
+  - name: int_memberships_current
+    description: Highest-ranked legacy membership record per customer; this is load-time current membership, not membership as of order date.
+    columns:
+      - name: customer_id
+        description: Primary customer identifier for the selected membership.
+        data_tests: [not_null, unique]
+      - name: guild_id
+        description: Guild from the selected membership record.
+      - name: guild_tier
+        description: Normalized tier from the selected membership record.
+      - name: valid_from
+        description: Start date of the selected membership record.
+      - name: valid_to
+        description: End date of the selected membership record.
+
+unit_tests:
+  - name: int_memberships_current_tie_breaking
+    description: Open-ended memberships outrank closed memberships, and membership_id breaks ties when validity dates match.
+    model: int_memberships_current
+    given:
+      - input: ref('stg_guild_memberships')
+        rows:
+          - {membership_id: MEM-001, customer_id: CUST-OPEN, guild_id: GUILD-CLOSED, guild_tier: adept, valid_from: 2024-01-01, valid_to: 2099-12-31}
+          - {membership_id: MEM-002, customer_id: CUST-OPEN, guild_id: GUILD-OPEN, guild_tier: archmage, valid_from: 2023-01-01, valid_to: null}
+          - {membership_id: MEM-010, customer_id: CUST-TIE, guild_id: GUILD-LOWER-ID, guild_tier: apprentice, valid_from: 2024-06-01, valid_to: 2025-06-01}
+          - {membership_id: MEM-011, customer_id: CUST-TIE, guild_id: GUILD-HIGHER-ID, guild_tier: adept, valid_from: 2024-06-01, valid_to: 2025-06-01}
+    expect:
+      rows:
+        - {customer_id: CUST-OPEN, guild_id: GUILD-OPEN, guild_tier: archmage, valid_from: 2023-01-01, valid_to: null}
+        - {customer_id: CUST-TIE, guild_id: GUILD-HIGHER-ID, guild_tier: adept, valid_from: 2024-06-01, valid_to: 2025-06-01}

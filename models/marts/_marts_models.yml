@@ -1,0 +1,35 @@
+version: 2
+
+models:
+  - name: fct_order_profitability
+    description: Order profitability fact at one row per order_id, preserving the legacy procedure's current-membership and null-rollup behavior.
+    columns:
+      - name: order_id
+        description: Primary order identifier and fact grain.
+        data_tests: [not_null, unique]
+      - name: customer_id
+        description: Customer associated with the order.
+      - name: shop_id
+        description: Shop associated with the order.
+      - name: ordered_at
+        description: Parsed order timestamp.
+      - name: ordered_date
+        description: Calendar date of the order.
+      - name: gross_revenue_gold
+        description: Gross line-item revenue converted to gold.
+      - name: discount_gold
+        description: Order discount converted to gold.
+      - name: net_revenue_gold
+        description: Gross revenue less discount; remains null when no item rollup exists.
+      - name: paid_amount_gold
+        description: Total successful payment amount in gold; remains null when no payment rollup exists.
+      - name: payment_state
+        description: Paid when any payment succeeded, otherwise cancelled for cancelled orders, otherwise unpaid.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [paid, cancelled, unpaid]
+      - name: is_home_region_order
+        description: True when normalized customer and shop regions match; false when either is missing.
+      - name: loaded_at
+        description: Timestamp when dbt built the fact; excluded from parity comparisons because it changes each run.
