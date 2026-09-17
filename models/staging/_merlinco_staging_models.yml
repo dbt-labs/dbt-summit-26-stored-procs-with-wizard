@@ -1,0 +1,153 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: >
+      Order headers cleaned to source grain (one row per order_id). Normalizes
+      status/channel casing, parses ordered_at, and converts discount_copper
+      to numeric with a derived discount_gold, matching the legacy
+      sp_load_order_profitability tmp_orders_clean step. Rows with a null
+      order_id are filtered out.
+    columns:
+      - name: order_id
+        description: Primary order identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Customer identifier.
+      - name: shop_id
+        description: Shop identifier.
+      - name: ordered_at
+        description: Order timestamp, parsed from raw text.
+      - name: order_status
+        description: Normalized (lowercased, trimmed) order status.
+      - name: order_channel
+        description: Normalized (lowercased, trimmed) order channel.
+      - name: discount_copper
+        description: Order discount in copper coins, cast to numeric.
+      - name: discount_gold
+        description: Order discount in gold coins, derived as discount_copper / 100.
+
+  - name: stg_order_items
+    description: >
+      Order line items cleaned to source grain (one row per order_item_id).
+      Casts quantity and unit_price_copper to numeric. Rollup to order grain
+      happens in int_order_item_rollup, not here.
+    columns:
+      - name: order_item_id
+        description: Primary order line item identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: order_id
+        description: Order identifier.
+        data_tests:
+          - not_null
+      - name: potion_sku
+        description: Potion SKU sold on this line.
+      - name: quantity
+        description: Ordered quantity, cast to numeric.
+      - name: unit_price_copper
+        description: Unit price in copper coins, cast to numeric.
+
+  - name: stg_payments
+    description: >
+      Payment attempts cleaned to source grain (one row per payment_id).
+      Casts amount_copper to numeric, normalizes status casing, and parses
+      paid_at. Rollup to order grain (successful amounts, latest paid
+      timestamp) happens in int_payments_rollup, not here.
+    columns:
+      - name: payment_id
+        description: Primary payment identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: order_id
+        description: Order identifier.
+        data_tests:
+          - not_null
+      - name: method
+        description: Payment method.
+      - name: amount_copper
+        description: Payment amount in copper coins, cast to numeric.
+      - name: payment_status
+        description: Normalized (lowercased, trimmed) payment status.
+      - name: paid_at
+        description: Payment timestamp, parsed from raw text.
+
+  - name: stg_customers
+    description: >
+      Customer records cleaned to source grain (one row per customer_id).
+      Normalizes email casing, standardizes home_region (including the
+      'NR' -> 'Northern Reaches' business rule), parses signed_up_at and
+      birth_year, and normalizes favored_discipline casing.
+    columns:
+      - name: customer_id
+        description: Primary customer identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: full_name
+        description: Customer display name.
+      - name: email
+        description: Normalized (lowercased, trimmed) customer email address.
+      - name: home_region
+        description: >
+          Standardized customer home region. The raw 'NR' code is expanded to
+          'Northern Reaches'; all other values are title-cased.
+      - name: signed_up_at
+        description: Customer signup date, parsed from raw text.
+      - name: birth_year
+        description: Customer birth year, cast to numeric.
+      - name: favored_discipline
+        description: Title-cased customer favored magical discipline.
+
+  - name: stg_shops
+    description: >
+      Shop locations cleaned to source grain (one row per shop_id).
+      Standardizes region formatting and parses opened_at.
+    columns:
+      - name: shop_id
+        description: Primary shop identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: shop_name
+        description: Shop name.
+      - name: city
+        description: Shop city.
+      - name: shop_region
+        description: Title-cased shop region.
+      - name: opened_at
+        description: Shop opening date, parsed from raw text.
+
+  - name: stg_guild_memberships
+    description: >
+      Guild membership history cleaned to source grain (one row per
+      membership_id). Retains membership_id so int_memberships_current can
+      deterministically break ties when selecting each customer's current
+      membership. Normalizes guild_tier casing and parses valid_from/valid_to.
+    columns:
+      - name: membership_id
+        description: >
+          Primary membership identifier. Retained for deterministic
+          tie-breaking when deduping to a customer's current membership.
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Customer identifier.
+        data_tests:
+          - not_null
+      - name: guild_id
+        description: Guild identifier.
+      - name: guild_tier
+        description: Normalized (lowercased, trimmed) membership tier.
+      - name: valid_from
+        description: Membership start date, parsed from raw text.
+      - name: valid_to
+        description: >
+          Membership end date, parsed from raw text. Null (including blank
+          source values) indicates an open-ended, currently valid membership.
+

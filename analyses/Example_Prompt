@@ -1,5 +1,5 @@
 Example:
-Context: I'm migrating a legacy stored procedure into modular dbt models. The proc... I want to split those concerns into a small DAG with clear grain at each layer.
+Context: I'm migrating a legacy stored procedure into modular dbt models. The proc (analyses/legacy_sp_load_order_profitability.sql) I want to split those concerns into a small DAG with clear grain at each layer.
 
 Tables and relationships:
 - raw_orders — one row per order
