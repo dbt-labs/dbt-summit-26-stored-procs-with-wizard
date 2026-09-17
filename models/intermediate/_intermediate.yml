@@ -1,0 +1,98 @@
+version: 2
+
+models:
+  - name: int_order_item_rollup
+    description: Order-item measures aggregated to one row per order.
+    columns:
+      - name: order_id
+        description: Primary order identifier for the rollup.
+        data_tests:
+          - not_null
+          - unique
+      - name: item_quantity
+        description: Total quantity across the order's line items.
+      - name: gross_revenue_copper
+        description: Gross order revenue in copper coins before discounts.
+      - name: gross_revenue_gold
+        description: Gross order revenue in gold coins before discounts.
+      - name: line_count
+        description: Number of line-item records on the order.
+      - name: distinct_potions
+        description: Number of distinct potion SKUs on the order.
+
+  - name: int_payments_rollup
+    description: Payment attempts aggregated to one row per order.
+    columns:
+      - name: order_id
+        description: Primary order identifier for the rollup.
+        data_tests:
+          - not_null
+          - unique
+      - name: paid_amount_copper
+        description: Sum of successful payment attempts in copper coins.
+      - name: paid_amount_gold
+        description: Sum of successful payment attempts in gold coins.
+      - name: latest_paid_at
+        description: Latest timestamp across all payment attempts, preserving legacy behavior.
+      - name: has_successful_payment
+        description: One when any successful payment attempt exists, otherwise zero.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+      - name: payment_attempt_count
+        description: Number of payment attempts recorded for the order.
+
+  - name: int_memberships_current
+    description: One selected guild membership per customer using the legacy latest-record tie-break rule.
+    columns:
+      - name: membership_id
+        description: Identifier of the selected membership record.
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Customer associated with the selected membership.
+        data_tests:
+          - not_null
+          - unique
+      - name: guild_id
+        description: Guild associated with the selected membership.
+      - name: guild_tier
+        description: Normalized tier of the selected membership.
+      - name: valid_from
+        description: Validity start date of the selected membership.
+      - name: valid_to
+        description: Validity end date of the selected membership.
+
+unit_tests:
+  - name: payments_rollup_preserves_success_and_latest_attempt_rules
+    description: Successful attempts contribute value while the latest timestamp considers every attempt.
+    model: int_payments_rollup
+    given:
+      - input: ref('stg_payments')
+        rows:
+          - {payment_id: P1, order_id: O1, amount_copper: 100, payment_status: success, paid_at: '2026-01-01 10:00:00'}
+          - {payment_id: P2, order_id: O1, amount_copper: 200, payment_status: failed, paid_at: '2026-01-03 10:00:00'}
+          - {payment_id: P3, order_id: O1, amount_copper: 50, payment_status: refunded, paid_at: '2026-01-02 10:00:00'}
+    expect:
+      rows:
+        - {order_id: O1, paid_amount_copper: 100, paid_amount_gold: 1.0, latest_paid_at: '2026-01-03 10:00:00', has_successful_payment: 1, payment_attempt_count: 3}
+
+  - name: memberships_current_applies_legacy_tie_breaks
+    description: Open-ended records, latest starts, and highest membership identifiers win in that order.
+    model: int_memberships_current
+    given:
+      - input: ref('stg_guild_memberships')
+        rows:
+          - {membership_id: M1, customer_id: C1, guild_id: G1, guild_tier: apprentice, valid_from: '2025-01-01', valid_to: '2026-01-01'}
+          - {membership_id: M2, customer_id: C1, guild_id: G2, guild_tier: adept, valid_from: '2024-01-01', valid_to: null}
+          - {membership_id: M3, customer_id: C2, guild_id: G1, guild_tier: apprentice, valid_from: '2024-01-01', valid_to: '2026-01-01'}
+          - {membership_id: M4, customer_id: C2, guild_id: G2, guild_tier: adept, valid_from: '2025-01-01', valid_to: '2026-01-01'}
+          - {membership_id: M5, customer_id: C3, guild_id: G1, guild_tier: apprentice, valid_from: '2025-01-01', valid_to: '2026-01-01'}
+          - {membership_id: M6, customer_id: C3, guild_id: G3, guild_tier: archmage, valid_from: '2025-01-01', valid_to: '2026-01-01'}
+    expect:
+      rows:
+        - {membership_id: M2, customer_id: C1, guild_id: G2}
+        - {membership_id: M4, customer_id: C2, guild_id: G2}
+        - {membership_id: M6, customer_id: C3, guild_id: G3}

@@ -1,0 +1,376 @@
+version: 2
+
+models:
+  - name: fct_order_profitability
+    description: >
+      Order-grain revenue and payment fact migrated from sp_load_order_profitability.
+      Despite the legacy name, the model contains revenue after discounts and does not
+      contain product cost or profit measures.
+    config:
+      contract:
+        enforced: true
+    semantic_model:
+      enabled: true
+    agg_time_dimension: ordered_date
+    columns:
+      - name: order_id
+        description: Primary order identifier and grain of the fact.
+        data_type: varchar
+        constraints:
+          - type: not_null
+        entity:
+          type: primary
+          name: order_record
+
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Customer that placed the order.
+        data_type: varchar
+        entity:
+          type: foreign
+          name: customer
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+      - name: customer_name
+        description: Customer display name for row-level investigation.
+        data_type: varchar
+      - name: customer_email
+        description: Normalized customer email for restricted row-level investigation.
+        data_type: varchar
+      - name: home_region
+        description: Normalized customer home region.
+        data_type: varchar
+        dimension:
+          type: categorical
+      - name: favored_discipline
+        description: Customer's normalized favored magical discipline.
+        data_type: varchar
+        dimension:
+          type: categorical
+      - name: guild_id
+        description: Guild on the selected customer membership.
+        data_type: varchar
+        entity:
+          type: foreign
+          name: guild
+      - name: guild_tier
+        description: Tier on the selected customer membership.
+        data_type: varchar
+        dimension:
+          type: categorical
+      - name: shop_id
+        description: Shop associated with the order.
+        data_type: varchar
+        entity:
+          type: foreign
+          name: shop
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_shops')
+                field: shop_id
+      - name: shop_name
+        description: Shop name.
+        data_type: varchar
+        dimension:
+          type: categorical
+      - name: shop_city
+        description: City containing the shop.
+        data_type: varchar
+        dimension:
+          type: categorical
+      - name: shop_region
+        description: Normalized shop region.
+        data_type: varchar
+        dimension:
+          type: categorical
+      - name: ordered_at
+        description: Timestamp when the order was placed, retained for row-level analysis.
+        data_type: timestamp_ntz
+      - name: ordered_date
+
+        description: Calendar date when the order was placed.
+        data_type: date
+        granularity: day
+        dimension:
+          type: time
+      - name: order_status
+        description: Normalized operational order status.
+        data_type: varchar
+        dimension:
+          type: categorical
+      - name: order_channel
+        description: Normalized channel through which the order was placed.
+        data_type: varchar
+        dimension:
+          type: categorical
+      - name: item_quantity
+        description: Total quantity across all order lines.
+        data_type: number(38, 0)
+      - name: line_count
+        description: Number of order-item records.
+        data_type: number(38, 0)
+      - name: distinct_potions
+        description: Number of distinct potion SKUs within the order; not additive across orders.
+        data_type: number(38, 0)
+      - name: gross_revenue_copper
+        description: Gross revenue before discounts in copper coins.
+        data_type: number(38, 0)
+      - name: gross_revenue_gold
+        description: Gross revenue before discounts in gold coins.
+        data_type: number(38, 2)
+      - name: discount_copper
+        description: Order discount in copper coins.
+        data_type: number(38, 0)
+      - name: discount_gold
+        description: Order discount in gold coins.
+        data_type: number(38, 2)
+      - name: net_revenue_copper
+        description: Gross revenue less discount in copper coins; this is not profit.
+        data_type: number(38, 0)
+      - name: net_revenue_gold
+        description: Gross revenue less discount in gold coins; this is not profit.
+        data_type: number(38, 2)
+      - name: paid_amount_copper
+        description: Sum of successful payment attempts in copper coins.
+        data_type: number(38, 0)
+      - name: paid_amount_gold
+        description: Sum of successful payment attempts in gold coins.
+        data_type: number(38, 2)
+      - name: latest_paid_at
+        description: Latest timestamp across all payment attempts, including unsuccessful attempts.
+        data_type: timestamp_ntz
+      - name: payment_attempt_count
+        description: Number of payment attempts recorded for the order.
+        data_type: number(38, 0)
+      - name: payment_state
+
+        description: Paid when any successful payment exists, otherwise cancelled or unpaid.
+        data_type: varchar
+        dimension:
+          type: categorical
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['paid', 'cancelled', 'unpaid']
+      - name: is_home_region_order
+        description: Whether normalized customer and shop regions match.
+        data_type: boolean
+        dimension:
+          type: categorical
+      - name: loaded_at
+        description: Timestamp when dbt rebuilt the fact table.
+        data_type: timestamp_tz
+
+    metrics:
+      - name: order_count
+        description: Number of orders.
+        label: Order Count
+        type: simple
+        agg: count
+        expr: 1
+      - name: customer_count
+        description: Distinct customers placing orders.
+        label: Customer Count
+        type: simple
+        agg: count_distinct
+        expr: customer_id
+      - name: gross_revenue_gold
+        description: Gross order revenue before discounts in gold coins.
+        label: Gross Revenue (Gold)
+        type: simple
+        agg: sum
+        expr: gross_revenue_gold
+      - name: discount_gold
+        description: Total order discounts in gold coins.
+        label: Discounts (Gold)
+        type: simple
+        agg: sum
+        expr: discount_gold
+      - name: net_revenue_gold
+        description: Gross revenue less discounts in gold coins; this is not profit.
+        label: Net Revenue (Gold)
+        type: simple
+        agg: sum
+        expr: net_revenue_gold
+      - name: paid_amount_gold
+        description: Total value of successful payment attempts in gold coins.
+        label: Paid Amount (Gold)
+        type: simple
+        agg: sum
+        expr: paid_amount_gold
+      - name: item_quantity
+        description: Total potion units ordered.
+        label: Item Quantity
+        type: simple
+        agg: sum
+        expr: item_quantity
+      - name: payment_attempt_count
+        description: Total payment attempts.
+        label: Payment Attempt Count
+        type: simple
+        agg: sum
+        expr: payment_attempt_count
+      - name: paid_order_count
+        description: Number of orders with at least one successful payment attempt.
+        label: Paid Order Count
+        type: simple
+        agg: count
+        expr: 1
+        filter: |
+          {{ Dimension('order_record__payment_state') }} = 'paid'
+      - name: unpaid_order_count
+        description: Number of non-cancelled orders without a successful payment attempt.
+        label: Unpaid Order Count
+        type: simple
+        agg: count
+        expr: 1
+        filter: |
+          {{ Dimension('order_record__payment_state') }} = 'unpaid'
+      - name: cancelled_order_count
+        description: Number of cancelled orders without a successful payment attempt.
+        label: Cancelled Order Count
+        type: simple
+        agg: count
+        expr: 1
+        filter: |
+          {{ Dimension('order_record__payment_state') }} = 'cancelled'
+      - name: home_region_order_count
+        description: Number of orders placed in the customer's normalized home region.
+        label: Home Region Order Count
+        type: simple
+        agg: count
+        expr: 1
+        filter: |
+          {{ Dimension('order_record__is_home_region_order') }} = true
+
+      - name: average_net_revenue_per_order
+        description: Average net revenue after discounts per order in gold coins.
+        label: Average Net Revenue per Order
+        type: ratio
+        numerator: net_revenue_gold
+        denominator: order_count
+      - name: average_items_per_order
+        description: Average item quantity per order.
+        label: Average Items per Order
+        type: ratio
+        numerator: item_quantity
+        denominator: order_count
+      - name: average_discount_per_order
+        description: Average discount per order in gold coins.
+        label: Average Discount per Order
+        type: ratio
+        numerator: discount_gold
+        denominator: order_count
+      - name: paid_order_rate
+        description: Share of orders with at least one successful payment attempt.
+        label: Paid Order Rate
+        type: ratio
+        numerator: paid_order_count
+        denominator: order_count
+      - name: unpaid_order_rate
+        description: Share of orders classified as unpaid.
+        label: Unpaid Order Rate
+        type: ratio
+        numerator: unpaid_order_count
+        denominator: order_count
+      - name: cancellation_rate
+        description: Share of orders classified as cancelled.
+        label: Cancellation Rate
+        type: ratio
+        numerator: cancelled_order_count
+        denominator: order_count
+      - name: home_region_order_rate
+        description: Share of orders placed in the customer's normalized home region.
+        label: Home Region Order Rate
+        type: ratio
+        numerator: home_region_order_count
+        denominator: order_count
+
+      - name: net_revenue_month_to_date
+        description: Month-to-date net revenue after discounts in gold coins.
+        label: Net Revenue MTD (Gold)
+        type: cumulative
+        input_metric: net_revenue_gold
+        grain_to_date: month
+        period_agg: last
+      - name: net_revenue_year_to_date
+        description: Year-to-date net revenue after discounts in gold coins.
+        label: Net Revenue YTD (Gold)
+        type: cumulative
+        input_metric: net_revenue_gold
+        grain_to_date: year
+        period_agg: last
+      - name: net_revenue_trailing_30_days
+        description: Net revenue after discounts over the trailing 30-day window.
+        label: Net Revenue Trailing 30 Days (Gold)
+        type: cumulative
+        input_metric: net_revenue_gold
+        window: 30 days
+        period_agg: last
+
+      - name: net_revenue_growth_month_over_month
+        description: Change in monthly net revenue divided by the previous month's net revenue.
+        label: Net Revenue Growth Month over Month
+        type: derived
+        expr: (current_net_revenue - previous_net_revenue) / nullif(previous_net_revenue, 0)
+        input_metrics:
+          - name: net_revenue_gold
+            alias: current_net_revenue
+          - name: net_revenue_gold
+            alias: previous_net_revenue
+            offset_window: 1 month
+      - name: order_growth_month_over_month
+        description: Change in monthly order count divided by the previous month's order count.
+        label: Order Growth Month over Month
+        type: derived
+        expr: (current_orders - previous_orders) / nullif(previous_orders, 0)
+        input_metrics:
+          - name: order_count
+            alias: current_orders
+          - name: order_count
+            alias: previous_orders
+            offset_window: 1 month
+
+
+unit_tests:
+  - name: order_profitability_preserves_payment_and_join_rules
+    description: Orders survive optional joins and payment success takes precedence over cancellation.
+    model: fct_order_profitability
+    given:
+      - input: ref('stg_orders')
+        rows:
+          - {order_id: O1, customer_id: C1, shop_id: S1, ordered_at: '2026-01-01 10:00:00', order_status: cancelled, order_channel: in_store, discount_copper: 100, discount_gold: 1.0}
+          - {order_id: O2, customer_id: C2, shop_id: S2, ordered_at: '2026-01-02 10:00:00', order_status: cancelled, order_channel: marketplace, discount_copper: 0, discount_gold: 0.0}
+          - {order_id: O3, customer_id: C3, shop_id: S3, ordered_at: '2026-01-03 10:00:00', order_status: placed, order_channel: courier_owl, discount_copper: 0, discount_gold: 0.0}
+      - input: ref('int_order_item_rollup')
+        rows:
+          - {order_id: O1, item_quantity: 1, line_count: 1, distinct_potions: 1, gross_revenue_copper: 500, gross_revenue_gold: 5.0}
+          - {order_id: O2, item_quantity: 2, line_count: 1, distinct_potions: 1, gross_revenue_copper: 600, gross_revenue_gold: 6.0}
+          - {order_id: O3, item_quantity: 3, line_count: 1, distinct_potions: 1, gross_revenue_copper: 700, gross_revenue_gold: 7.0}
+      - input: ref('int_payments_rollup')
+        rows:
+          - {order_id: O1, paid_amount_copper: 400, paid_amount_gold: 4.0, latest_paid_at: '2026-01-01 11:00:00', has_successful_payment: 1, payment_attempt_count: 1}
+      - input: ref('stg_customers')
+        rows:
+          - {customer_id: C1, full_name: Customer One, email: one@example.com, home_region: North, favored_discipline: Alchemy}
+          - {customer_id: C2, full_name: Customer Two, email: two@example.com, home_region: South, favored_discipline: Charms}
+          - {customer_id: C3, full_name: Customer Three, email: three@example.com, home_region: East, favored_discipline: Potions}
+      - input: ref('int_memberships_current')
+        rows:
+          - {membership_id: M1, customer_id: C1, guild_id: G1, guild_tier: adept, valid_from: '2025-01-01', valid_to: null}
+      - input: ref('stg_shops')
+        rows:
+          - {shop_id: S1, shop_name: Shop One, city: City One, shop_region: North}
+          - {shop_id: S2, shop_name: Shop Two, city: City Two, shop_region: West}
+          - {shop_id: S3, shop_name: Shop Three, city: City Three, shop_region: East}
+    expect:
+      rows:
+        - {order_id: O1, net_revenue_copper: 400, net_revenue_gold: 4.0, payment_state: paid, is_home_region_order: true}
+        - {order_id: O2, net_revenue_copper: 600, net_revenue_gold: 6.0, payment_state: cancelled, is_home_region_order: false}
+        - {order_id: O3, net_revenue_copper: 700, net_revenue_gold: 7.0, payment_state: unpaid, is_home_region_order: true}
