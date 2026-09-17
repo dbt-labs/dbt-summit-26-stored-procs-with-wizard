@@ -1,0 +1,20 @@
+with source as (
+
+    select * from {{ source('merlinco_apothecaries', 'RAW_ORDER_ITEMS') }}
+
+),
+
+renamed as (
+
+    select
+        order_item_id,
+        order_id,
+        potion_sku,
+        coalesce(try_to_number(quantity), 0) as quantity,
+        coalesce(try_to_number(unit_price_copper), 0) as unit_price_copper,
+        coalesce(try_to_number(unit_price_copper), 0) / 100.0 as unit_price_gold
+    from source
+
+)
+
+select * from renamed

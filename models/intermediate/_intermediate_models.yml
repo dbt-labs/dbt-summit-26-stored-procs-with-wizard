@@ -1,0 +1,59 @@
+version: 2
+
+models:
+  - name: int_order_items_aggregated
+    description: Order-item measures aggregated to one row per order.
+    columns:
+      - name: order_id
+        description: Order identifier and grain of the model.
+        data_tests:
+          - not_null
+          - unique
+      - name: item_quantity
+        description: Total quantity of items on the order.
+      - name: gross_revenue_copper
+        description: Gross order-item revenue in copper coins before discounts.
+      - name: gross_revenue_gold
+        description: Gross order-item revenue converted to gold coins before discounts.
+      - name: line_count
+        description: Number of order-item records on the order.
+      - name: distinct_potions
+        description: Number of distinct potion SKUs on the order.
+
+  - name: int_payments_aggregated
+    description: Payment attempts aggregated to one row per order.
+    columns:
+      - name: order_id
+        description: Order identifier and grain of the model.
+        data_tests:
+          - not_null
+          - unique
+      - name: paid_amount_copper
+        description: Total successful payment amount in copper coins.
+      - name: paid_amount_gold
+        description: Total successful payment amount in gold coins.
+      - name: latest_paid_at
+        description: Latest timestamp across all payment attempts for the order.
+      - name: has_successful_payment
+        description: Numeric flag indicating whether the order has a successful payment.
+      - name: payment_attempt_count
+        description: Number of payment attempts recorded for the order.
+
+  - name: int_guild_memberships_current
+    description: Highest-ranked guild membership for each customer using the legacy procedure ordering.
+    columns:
+      - name: membership_id
+        description: Identifier of the selected guild membership record.
+      - name: customer_id
+        description: Customer identifier and grain of the model.
+        data_tests:
+          - not_null
+          - unique
+      - name: guild_id
+        description: Guild associated with the selected membership.
+      - name: guild_tier
+        description: Normalized tier of the selected membership.
+      - name: valid_from
+        description: Start date of the selected membership.
+      - name: valid_to
+        description: End date of the selected membership, null for open-ended memberships.
