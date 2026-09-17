@@ -1,28 +1,5 @@
 with payments as (
 
-<<<<<<< HEAD
-    select *
-    from {{ ref('stg_payments') }}
-
-)
-
-select
-    order_id,
-    sum(
-        case
-            when payment_status = 'success' then amount
-            else 0
-        end
-    ) as paid_amount,
-    max(
-        case
-            when payment_status = 'success' then 1
-            else 0
-        end
-    ) as has_successful_payment
-from payments
-group by order_id
-=======
     select * from {{ ref('stg_payments') }}
 
 ),
@@ -33,6 +10,7 @@ rollup as (
         order_id,
         sum(case when status = 'success' then amount_copper else 0 end) as paid_amount_copper,
         sum(case when status = 'success' then amount_copper else 0 end) / 100.0 as paid_amount_gold,
+        sum(case when status = 'success' then amount_copper else 0 end) / 100.0 as paid_amount,
         max(paid_at) as latest_paid_at,
         max(case when status = 'success' then 1 else 0 end) as has_successful_payment,
         count(*) as payment_attempt_count
@@ -44,4 +22,3 @@ rollup as (
 )
 
 select * from rollup
->>>>>>> 4169a087ef633cdfd35394649f8d86c8360bf4f7

@@ -196,3 +196,13 @@ models:
         type: simple
         agg: sum
         expr: distinct_potions
+
+
+      - name: payment_collection_rate
+        description: >
+          Successfully paid amount as a share of net revenue. A value of 1 indicates that net
+          revenue has been fully collected; lower values indicate an outstanding balance.
+        label: Payment Collection Rate
+        type: ratio
+        numerator: paid_amount_gold
+        denominator: net_revenue_gold
