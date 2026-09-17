@@ -1,0 +1,198 @@
+version: 2
+
+models:
+  - name: time_spine_daily
+    description: A time spine with one row per day, from 2000-01-01 to 2030-01-01, used by MetricFlow for time-based joins and aggregations.
+    time_spine:
+      standard_granularity_column: date_day
+    columns:
+      - name: date_day
+        description: The base date column for daily granularity.
+        granularity: day
+
+
+  - name: fct_order_profitability
+    description: >
+      One row per order, replacing the legacy `sp_load_order_profitability` procedure's temp-table
+      joins and full delete/insert. Joins order headers to item and payment rollups, the customer's
+      current guild membership (as-of-now, not as-of-order, matching legacy parity), and shop
+      dimensions to derive net revenue, payment state, and home-region loyalty.
+    config:
+      materialized: table
+    semantic_model:
+      enabled: true
+    agg_time_dimension: ordered_date
+    columns:
+      - name: order_id
+        description: Primary order identifier; one row per order.
+        data_tests:
+          - not_null
+          - unique
+        entity:
+          type: primary
+          name: orders
+
+      - name: customer_id
+        description: Customer identifier.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+        entity:
+          type: foreign
+          name: customer
+      - name: customer_name
+        description: Customer display name.
+      - name: customer_email
+        description: Customer email address.
+      - name: home_region
+        description: Customer's standardized home region.
+        dimension:
+          type: categorical
+      - name: favored_discipline
+        description: Customer's favored magical discipline.
+        dimension:
+          type: categorical
+      - name: guild_id
+        description: Guild identifier for the customer's current membership (as of now, not as of order date).
+      - name: guild_tier
+        description: Membership tier for the customer's current membership.
+        dimension:
+          type: categorical
+      - name: shop_id
+        description: Shop identifier where the order was placed.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_shops')
+                field: shop_id
+        entity:
+          type: foreign
+          name: shop
+      - name: shop_name
+        description: Shop name.
+      - name: shop_city
+        description: Shop city.
+      - name: shop_region
+        description: Standardized shop region.
+        dimension:
+          type: categorical
+      - name: ordered_at
+        description: Parsed order timestamp.
+      - name: ordered_date
+        description: Order date, cast from `ordered_at`. Default time dimension for the semantic model.
+        granularity: day
+        dimension:
+          type: time
+      - name: order_status
+        description: Lower-cased, trimmed order status.
+        dimension:
+          type: categorical
+      - name: order_channel
+        description: Lower-cased, trimmed order channel.
+        dimension:
+          type: categorical
+      - name: item_quantity
+        description: Total ordered quantity across all line items; null if the order has no item rollup.
+      - name: line_count
+        description: Number of order line items; null if the order has no item rollup.
+      - name: distinct_potions
+        description: Count of distinct potion SKUs ordered; null if the order has no item rollup.
+      - name: gross_revenue_copper
+        description: Gross revenue in copper coins; null if the order has no item rollup.
+      - name: gross_revenue_gold
+        description: Gross revenue in gold coins; null if the order has no item rollup.
+      - name: discount_copper
+        description: Order discount in copper coins.
+      - name: discount_gold
+        description: Order discount in gold coins.
+      - name: net_revenue_copper
+        description: >
+          Gross revenue minus discount, in copper coins; null if the order has no item rollup.
+          Expected to be nonnegative -- discounts are not currently expected to exceed gross
+          revenue (no refunds, credits, or over-discounting in the current business model).
+        data_tests:
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: ">= 0"
+      - name: net_revenue_gold
+        description: Gross revenue minus discount, in gold coins; null if the order has no item rollup.
+      - name: paid_amount_copper
+        description: Successful paid amount in copper coins; null if the order has no payment rollup.
+      - name: paid_amount_gold
+        description: Successful paid amount in gold coins; null if the order has no payment rollup.
+      - name: latest_paid_at
+        description: Most recent parsed payment timestamp; null if the order has no payment rollup.
+      - name: payment_attempt_count
+        description: Count of all payment attempts; null if the order has no payment rollup.
+      - name: payment_state
+        description: >
+          Derived payment classification: `paid` if the order has any successful payment, `cancelled`
+          if the order status is cancelled/canceled and has no successful payment, otherwise `unpaid`.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['paid', 'cancelled', 'unpaid']
+        dimension:
+          type: categorical
+      - name: is_home_region_order
+        description: True when the customer's home region matches the shop's region.
+      - name: loaded_at
+        description: >
+          Model build timestamp (`current_timestamp()`). This is execution-time metadata and will not
+          match historical procedure-run values during parity testing.
+
+    metrics:
+      - name: order_count
+        description: Count of orders. Grain is one row per order_id, so this is a simple row count.
+        label: Order Count
+        type: simple
+        agg: count
+        expr: order_id
+
+      - name: gross_revenue_gold
+        description: >
+          Total gross revenue (before discount) across orders, in gold coins. Null item rollups
+          contribute nothing, matching the fact's left-join behavior.
+        label: Gross Revenue (Gold)
+        type: simple
+        agg: sum
+        expr: gross_revenue_gold
+
+      - name: discount_gold
+        description: Total order discount across orders, in gold coins.
+        label: Discount (Gold)
+        type: simple
+        agg: sum
+        expr: discount_gold
+
+      - name: net_revenue_gold
+        description: Total net revenue (gross revenue minus discount) across orders, in gold coins.
+        label: Net Revenue (Gold)
+        type: simple
+        agg: sum
+        expr: net_revenue_gold
+
+      - name: paid_amount_gold
+        description: Total successfully paid amount across orders, in gold coins.
+        label: Paid Amount (Gold)
+        type: simple
+        agg: sum
+        expr: paid_amount_gold
+
+      - name: item_quantity
+        description: Total ordered item quantity across orders.
+        label: Item Quantity
+        type: simple
+        agg: sum
+        expr: item_quantity
+
+      - name: distinct_potions
+        description: >
+          Sum of each order's distinct-potion-SKU count. This totals per-order variety across
+          orders; it is not a single distinct count of potions across the whole order set.
+        label: Distinct Potions (Summed)
+        type: simple
+        agg: sum
+        expr: distinct_potions

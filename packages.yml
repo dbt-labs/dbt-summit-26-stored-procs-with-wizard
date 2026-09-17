@@ -1,3 +1,8 @@
 packages:
   - package: dbt-labs/audit_helper
+<<<<<<< HEAD
     version: 0.14.0
+=======
+    version: [">=0.14.0", "<0.15.0"]
+
+>>>>>>> 4169a087ef633cdfd35394649f8d86c8360bf4f7

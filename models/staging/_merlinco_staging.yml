@@ -1,0 +1,124 @@
+version: 2
+
+models:
+  - name: stg_customers
+    description: One row per customer, with cleaned email, standardized home region, and parsed signup/birth-year fields.
+    columns:
+      - name: customer_id
+        description: Primary customer identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: full_name
+        description: Customer display name.
+      - name: email
+        description: Lower-cased, trimmed customer email address.
+      - name: home_region
+        description: Standardized home region; the `NR` code is expanded to "Northern Reaches", other values are title-cased.
+      - name: signed_up_at
+        description: Parsed customer signup date.
+      - name: birth_year
+        description: Parsed customer birth year.
+      - name: favored_discipline
+        description: Title-cased customer favored magical discipline.
+
+  - name: stg_shops
+    description: One row per shop, with standardized region formatting and parsed opening date.
+    columns:
+      - name: shop_id
+        description: Primary shop identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: shop_name
+        description: Shop name.
+      - name: city
+        description: Shop city.
+      - name: shop_region
+        description: Title-cased shop region.
+      - name: opened_at
+        description: Parsed shop opening date.
+
+  - name: stg_orders
+    description: One row per order header, with parsed timestamps and normalized status, channel, and discount fields. Orders with a null `order_id` are filtered out, matching the legacy procedure.
+    columns:
+      - name: order_id
+        description: Primary order identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Customer identifier.
+      - name: shop_id
+        description: Shop identifier.
+      - name: ordered_at
+        description: Parsed order timestamp.
+      - name: order_status
+        description: Lower-cased, trimmed order status.
+      - name: order_channel
+        description: Lower-cased, trimmed order channel.
+      - name: discount_copper
+        description: Order discount in copper coins, defaulted to 0 when not parseable.
+      - name: discount_gold
+        description: Order discount in gold coins (`discount_copper` / 100).
+
+  - name: stg_order_items
+    description: One row per order line item, with quantity and unit price cast to numeric. Retains source grain; no aggregation happens here.
+    columns:
+      - name: order_item_id
+        description: Primary order item identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: order_id
+        description: Order identifier.
+        data_tests:
+          - not_null
+      - name: potion_sku
+        description: Potion SKU.
+      - name: quantity
+        description: Ordered quantity, defaulted to 0 when not parseable.
+      - name: unit_price_copper
+        description: Unit price in copper coins, defaulted to 0 when not parseable.
+
+  - name: stg_payments
+    description: One row per payment attempt, with amount cast to numeric and status normalized. Retains source grain; successful-payment rollup logic lives downstream.
+    columns:
+      - name: payment_id
+        description: Primary payment identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: order_id
+        description: Order identifier.
+        data_tests:
+          - not_null
+      - name: method
+        description: Payment method.
+      - name: amount_copper
+        description: Payment amount in copper coins, defaulted to 0 when not parseable.
+      - name: status
+        description: Lower-cased, trimmed payment status.
+      - name: paid_at
+        description: Parsed payment timestamp.
+
+  - name: stg_guild_memberships
+    description: One row per customer guild membership interval. Retains `membership_id` for deterministic current-record tie-breaking downstream; no deduplication happens here.
+    columns:
+      - name: membership_id
+        description: Primary membership identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Customer identifier.
+        data_tests:
+          - not_null
+      - name: guild_id
+        description: Guild identifier.
+      - name: guild_tier
+        description: Lower-cased, trimmed membership tier.
+      - name: valid_from
+        description: Parsed membership start date.
+      - name: valid_to
+        description: Parsed membership end date; null indicates an open-ended (current) membership.

@@ -1,0 +1,83 @@
+version: 2
+
+models:
+  - name: int_order_item_rollup
+    description: Order-item line items rolled up to one row per order, matching the legacy procedure's `tmp_order_item_rollup` calculations.
+    columns:
+      - name: order_id
+        description: Order identifier; one row per order.
+        data_tests:
+          - not_null
+          - unique
+      - name: item_quantity
+        description: Total ordered quantity across all line items for the order.
+      - name: gross_revenue_copper
+        description: Sum of quantity times unit price across all line items, in copper coins.
+      - name: gross_revenue_gold
+        description: Gross revenue in gold coins (`gross_revenue_copper` / 100).
+      - name: line_count
+        description: Number of order line items.
+      - name: distinct_potions
+        description: Count of distinct potion SKUs ordered.
+
+  - name: int_payments_rollup
+    description: Payment attempts rolled up to one row per order, matching the legacy procedure's `tmp_payments_rollup` calculations. Only payments with a normalized `success` status count toward paid amounts.
+    columns:
+      - name: order_id
+        description: Order identifier; one row per order.
+        data_tests:
+          - not_null
+          - unique
+      - name: paid_amount_copper
+        description: Sum of successful payment amounts, in copper coins.
+      - name: paid_amount_gold
+        description: Successful paid amount in gold coins (`paid_amount_copper` / 100).
+      - name: latest_paid_at
+        description: Most recent parsed payment timestamp across all attempts.
+      - name: has_successful_payment
+        description: 1 if the order has at least one successful payment attempt, 0 otherwise.
+      - name: payment_attempt_count
+        description: Count of all payment attempts for the order, regardless of status.
+
+  - name: int_memberships_current
+    description: |
+      Deduplicates guild membership history to exactly one row per customer, matching the legacy
+      procedure's tie-break rule: the membership with the latest `valid_to` (open-ended memberships
+      treated as 2999-12-31) wins; ties are broken by the latest `valid_from`, then the highest
+      `membership_id`. This is an "as of now" current membership, not an as-of-order-date membership,
+      matching legacy parity.
+    columns:
+      - name: customer_id
+        description: Customer identifier; one row per customer.
+        data_tests:
+          - not_null
+          - unique
+      - name: guild_id
+        description: Guild identifier for the customer's current membership.
+      - name: guild_tier
+        description: Membership tier for the current membership.
+      - name: valid_from
+        description: Start date of the current membership.
+      - name: valid_to
+        description: End date of the current membership; null indicates an open-ended (current) membership.
+
+unit_tests:
+  - name: test_int_memberships_current_tie_break
+    description: >
+      Proves the current-membership tie-break rule: an open-ended membership (null valid_to) beats
+      a closed one for the same customer, and when valid_to/valid_from tie, the higher membership_id wins.
+    model: int_memberships_current
+    given:
+      - input: ref('stg_guild_memberships')
+        rows:
+          # customer WIZ-A: closed membership should lose to the open-ended one
+          - {membership_id: MEM-A1, customer_id: WIZ-A, guild_id: GLD-01, guild_tier: apprentice, valid_from: "2023-01-01", valid_to: "2023-06-01"}
+          - {membership_id: MEM-A2, customer_id: WIZ-A, guild_id: GLD-02, guild_tier: adept, valid_from: "2023-07-01", valid_to: null}
+          # customer WIZ-B: both open-ended with the same valid_from, higher membership_id should win
+          - {membership_id: MEM-B1, customer_id: WIZ-B, guild_id: GLD-03, guild_tier: apprentice, valid_from: "2024-01-01", valid_to: null}
+          - {membership_id: MEM-B2, customer_id: WIZ-B, guild_id: GLD-04, guild_tier: archmage, valid_from: "2024-01-01", valid_to: null}
+    expect:
+      rows:
+        - {customer_id: WIZ-A, guild_id: GLD-02, guild_tier: adept, valid_from: "2023-07-01", valid_to: null}
+        - {customer_id: WIZ-B, guild_id: GLD-04, guild_tier: archmage, valid_from: "2024-01-01", valid_to: null}
+
