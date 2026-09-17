@@ -1,0 +1,78 @@
+version: 2
+
+models:
+  - name: int_order_item_rollup
+    description: Order item measures aggregated to one row per order_id.
+    columns:
+      - name: order_id
+        description: Primary order identifier for the rollup.
+        data_tests:
+          - not_null
+          - unique
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+      - name: item_quantity
+        description: Total quantity across the order's line items.
+      - name: gross_revenue_copper
+        description: Gross line-item revenue in copper coins.
+      - name: gross_revenue_gold
+        description: Gross line-item revenue in gold.
+      - name: line_count
+        description: Number of line items on the order.
+      - name: distinct_potions
+        description: Number of distinct potion SKUs on the order.
+
+  - name: int_payments_rollup
+    description: Payment attempts aggregated to one row per order_id; only successful attempts contribute to paid amounts.
+    columns:
+      - name: order_id
+        description: Primary order identifier for the rollup.
+        data_tests:
+          - not_null
+          - unique
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+      - name: paid_amount_copper
+        description: Sum of successful payment attempts in copper coins.
+      - name: paid_amount_gold
+        description: Sum of successful payment attempts in gold.
+      - name: latest_paid_at
+        description: Latest timestamp across all payment attempts.
+      - name: has_successful_payment
+        description: Integer flag indicating whether any successful payment exists.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+      - name: payment_attempt_count
+        description: Number of payment attempts for the order.
+
+  - name: int_memberships_current
+    description: Latest guild membership record at one row per customer_id, ordered by valid_to, valid_from, and membership_id.
+    columns:
+      - name: membership_id
+        description: Selected membership record identifier.
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Primary customer identifier for the current-membership result.
+        data_tests:
+          - not_null
+          - unique
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+      - name: guild_id
+        description: Selected current guild identifier.
+      - name: guild_tier
+        description: Selected current guild tier.
+      - name: valid_from
+        description: Selected membership start date.
+      - name: valid_to
+        description: Selected membership end date.
