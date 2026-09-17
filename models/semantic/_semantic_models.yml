@@ -1,0 +1,14 @@
+version: 2
+
+models:
+  - name: metricflow_time_spine
+    description: Daily calendar from 2000-01-01 through 2099-12-31 for Semantic Layer time-based aggregation.
+    time_spine:
+      standard_granularity_column: date_day
+    columns:
+      - name: date_day
+        description: Calendar date at daily grain.
+        granularity: day
+        data_tests:
+          - not_null
+          - unique

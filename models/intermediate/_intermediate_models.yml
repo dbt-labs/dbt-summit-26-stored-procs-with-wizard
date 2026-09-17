@@ -1,0 +1,85 @@
+version: 2
+
+models:
+  - name: int_order_item_rollup
+    description: Order-item measures aggregated to one row per order.
+    columns:
+      - name: order_id
+        description: Primary order identifier for the rollup.
+        data_tests:
+          - not_null
+          - unique
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+      - name: item_quantity
+        description: Total item quantity on the order, with null quantities treated as zero.
+      - name: gross_revenue_copper
+        description: Extended gross revenue in copper coins before order discounts.
+      - name: gross_revenue_gold
+        description: Extended gross revenue converted to gold coins before order discounts.
+      - name: line_count
+        description: Number of order-item records on the order.
+      - name: distinct_potions
+        description: Number of distinct potion SKUs on the order.
+
+  - name: int_payments_rollup
+    description: Payment attempts aggregated to one row per order with successful-payment measures.
+    columns:
+      - name: order_id
+        description: Primary order identifier for the rollup.
+        data_tests:
+          - not_null
+          - unique
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+      - name: paid_amount_copper
+        description: Successful payment amount in copper coins.
+      - name: paid_amount_gold
+        description: Successful payment amount converted to gold coins.
+      - name: latest_paid_at
+        description: Latest timestamp across all payment attempts, matching the legacy procedure.
+      - name: has_successful_payment
+        description: One when any payment attempt succeeded; otherwise zero.
+      - name: payment_attempt_count
+        description: Count of all payment attempts for the order.
+
+  - name: int_memberships_current
+    description: One legacy-current guild membership per customer, selected by open-ended status and latest validity dates.
+    columns:
+      - name: customer_id
+        description: Primary customer identifier for the selected membership.
+        data_tests:
+          - not_null
+          - unique
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+      - name: guild_id
+        description: Guild on the selected membership.
+      - name: guild_tier
+        description: Normalized tier on the selected membership.
+      - name: valid_from
+        description: Start date of the selected membership.
+      - name: valid_to
+        description: End date of the selected membership; null indicates open-ended validity.
+
+unit_tests:
+  - name: test_int_memberships_current_legacy_tie_break
+    description: Open-ended memberships sort first, and membership_id breaks ties on equal dates.
+    model: int_memberships_current
+    given:
+      - input: ref('stg_guild_memberships')
+        rows:
+          - {membership_id: M001, customer_id: C001, guild_id: G_CLOSED, guild_tier: adept, valid_from: 2024-01-01, valid_to: 2025-12-31}
+          - {membership_id: M002, customer_id: C001, guild_id: G_OPEN, guild_tier: archmage, valid_from: 2023-01-01, valid_to: null}
+          - {membership_id: M003, customer_id: C002, guild_id: G_LOWER_ID, guild_tier: apprentice, valid_from: 2024-01-01, valid_to: 2025-12-31}
+          - {membership_id: M004, customer_id: C002, guild_id: G_HIGHER_ID, guild_tier: adept, valid_from: 2024-01-01, valid_to: 2025-12-31}
+    expect:
+      rows:
+        - {customer_id: C001, guild_id: G_OPEN, guild_tier: archmage}
+        - {customer_id: C002, guild_id: G_HIGHER_ID, guild_tier: adept}

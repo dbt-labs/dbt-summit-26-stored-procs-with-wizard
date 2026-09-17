@@ -1,0 +1,159 @@
+version: 2
+
+models:
+  - name: fct_order_profitability
+    description: Order-grain revenue, discount, payment, customer, membership, and shop context migrated from sp_load_order_profitability.
+    semantic_model:
+      enabled: true
+    agg_time_dimension: ordered_date
+    columns:
+      - name: order_id
+        description: Primary order identifier and fact grain.
+        entity:
+          type: primary
+          name: order_record
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Customer that placed the order.
+        entity:
+          type: foreign
+          name: customer
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+      - name: customer_name
+        description: Customer name at model build time.
+      - name: customer_email
+        description: Normalized customer email at model build time.
+      - name: home_region
+        description: Standardized customer home region.
+        dimension:
+          type: categorical
+      - name: favored_discipline
+        description: Standardized customer favored discipline.
+        dimension:
+          type: categorical
+      - name: guild_id
+        description: Guild from the customer's legacy-current membership.
+      - name: guild_tier
+        description: Normalized tier from the customer's legacy-current membership.
+        dimension:
+          type: categorical
+      - name: shop_id
+        description: Shop associated with the order.
+        entity:
+          type: foreign
+          name: shop
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_shops')
+                field: shop_id
+      - name: shop_name
+        description: Shop name at model build time.
+      - name: shop_city
+        description: Shop city at model build time.
+      - name: shop_region
+        description: Standardized shop region.
+        dimension:
+          type: categorical
+      - name: ordered_at
+        description: Order timestamp.
+      - name: ordered_date
+        description: Calendar date of the order.
+        granularity: day
+        dimension:
+          type: time
+      - name: order_status
+        description: Normalized order status.
+        dimension:
+          type: categorical
+      - name: order_channel
+        description: Normalized sales channel.
+        dimension:
+          type: categorical
+      - name: item_quantity
+        description: Total item quantity on the order.
+      - name: line_count
+        description: Number of order-item records.
+      - name: distinct_potions
+        description: Number of distinct potion SKUs on the order.
+      - name: gross_revenue_copper
+        description: Gross extended item revenue in copper coins before discounts.
+      - name: gross_revenue_gold
+        description: Gross extended item revenue in gold coins before discounts.
+      - name: discount_copper
+        description: Order discount in copper coins.
+      - name: discount_gold
+        description: Order discount in gold coins.
+      - name: net_revenue_copper
+        description: Gross revenue less discount in copper coins; this is revenue, not profit.
+      - name: net_revenue_gold
+        description: Gross revenue less discount in gold coins; this is revenue, not profit.
+      - name: paid_amount_copper
+        description: Sum of successful payment attempts in copper coins; null when no attempt exists.
+      - name: paid_amount_gold
+        description: Sum of successful payment attempts in gold coins; null when no attempt exists.
+      - name: latest_paid_at
+        description: Latest timestamp across all payment attempts.
+      - name: payment_attempt_count
+        description: Number of payment attempts; null when no attempt exists.
+      - name: payment_state
+        description: Paid when any attempt succeeded, cancelled for an unpaid cancelled order, otherwise unpaid.
+        dimension:
+          type: categorical
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [paid, cancelled, unpaid]
+      - name: is_home_region_order
+        description: True when standardized customer and shop regions are equal.
+      - name: loaded_at
+        description: Timestamp when dbt built the fact table.
+    metrics:
+      - name: order_count
+        label: Order Count
+        description: Number of orders represented in the order-grain fact.
+        type: simple
+        agg: count
+        expr: 1
+      - name: total_gross_revenue
+        label: Total Gross Revenue
+        description: Gross extended item revenue before order discounts, measured in gold coins.
+        type: simple
+        agg: sum
+        expr: gross_revenue_gold
+      - name: total_discounts
+        label: Total Discounts
+        description: Total order discounts measured in gold coins.
+        type: simple
+        agg: sum
+        expr: discount_gold
+      - name: total_net_revenue
+        label: Total Net Revenue
+        description: Gross revenue less order discounts, measured in gold coins; excludes product and operating costs.
+        type: simple
+        agg: sum
+        expr: net_revenue_gold
+      - name: total_paid_amount
+        label: Total Paid Amount
+        description: Total value of successful payment attempts measured in gold coins.
+        type: simple
+        agg: sum
+        expr: paid_amount_gold
+      - name: total_item_quantity
+        label: Total Item Quantity
+        description: Total quantity of items included in orders.
+        type: simple
+        agg: sum
+        expr: item_quantity
+      - name: summed_distinct_potions
+        label: Summed Distinct Potions per Order
+        description: Sum of each order's distinct potion count; the same potion can be counted once in multiple orders.
+        type: simple
+        agg: sum
+        expr: distinct_potions
