@@ -184,6 +184,28 @@ Run the narrowest `dbt build` selector that builds and tests the full fact linea
 
 **Expected checkpoint:** The fact DAG builds cleanly and tests the key model contracts.
 
+## 8b. Stage the legacy output (only if the legacy table is not readable)
+
+**Goal:** Give the parity audit a real legacy result to compare against when your role cannot read the original target table.
+
+```text
+My role cannot read the legacy procedure's original target relation, so I need a legacy output I can read. Stage one in my own writable space. Do not change any dbt models.
+
+First run `select current_role(), current_database(), current_schema()` and tell me where I can create objects. Prefer a separate schema named `<my current schema>_LEGACY` in my current database so the legacy table does not collide with the dbt model of the same name. If I cannot create a schema, use a `LEGACY_` table prefix in my current schema instead. Tell me which you chose before creating anything.
+
+Then:
+1. The procedure in `analyses/legacy_sp_load_order_profitability.sql` deletes from and inserts into a target table whose DDL is not in the file. Create that target table in the staging location with exactly the columns and order the procedure's `insert` writes. Derive types from the inserted expressions and confirm them; do not guess.
+2. Create a copy of the procedure in the staging location. Keep all of its logic unchanged. Point its reads at the sources declared in `models/staging/_merlinco_sources.yml` and its target at the staged table.
+3. Call the procedure and report the row count.
+4. Give me the fully qualified name of the staged table so I can use it in the parity audit.
+
+Do not edit the original file under `analyses/`; write the staging SQL as a new file there. If any step is blocked by permissions, stop and tell me exactly which privilege is missing.
+```
+
+**Expected checkpoint:** A readable legacy output table with the same row count as the procedure produces, and its fully qualified name.
+
+> **Facilitator note:** When describing parity results, say plainly that the legacy output was staged by running the original procedure logic in your own schema, not read from a production table.
+
 ## 9. Cast the audit spell: install and preview `audit_helper`
 
 **Goal:** Set up `dbt-labs/audit_helper` and use `compare_and_classify_query_results` to classify procedure-versus-dbt differences before cutover.
@@ -197,7 +219,7 @@ Add a project-owned package declaration for `dbt-labs/audit_helper` using the la
 
 Next, inspect the installed package documentation or macro source only to verify the exact signature and output columns for `audit_helper.compare_and_classify_query_results`. Do not guess its arguments.
 
-Create a project-owned preview audit query in the configured `analyses/` path. It must compare the legacy procedure output relation `analytics.mart.fct_order_profitability` with the new dbt `fct_order_profitability` model using `audit_helper.compare_and_classify_query_results`.
+Create a project-owned preview audit query in the configured `analyses/` path. It must compare the legacy procedure output relation `analytics.mart.fct_order_profitability` (or, if my role cannot read it, the staged legacy table from step 8b) with the new dbt `fct_order_profitability` model using `audit_helper.compare_and_classify_query_results`.
 
 Requirements:
 - use `ref('fct_order_profitability')` for the dbt relation;
