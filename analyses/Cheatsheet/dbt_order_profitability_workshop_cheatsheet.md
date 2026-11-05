@@ -20,6 +20,8 @@ Review `dbt_project.yml`, the existing models directory structure, `models/stagi
 
 I am migrating the Snowflake procedure `sp_load_order_profitability` to dbt. The raw inputs are existing warehouse tables, not seeds. Do not make changes yet.
 
+Use the sources declared in `models/staging/_merlinco_sources.yml`. The first version should reproduce the legacy output exactly, quirks included; treat any fixes as follow-ups, not blockers. Keep the answer short: a few sentences on what the procedure does, then only the three highest-risk behaviors.
+
 Summarize:
 1. the current project conventions and configured paths;
 2. every raw input relation and its role;

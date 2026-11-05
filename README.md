@@ -48,7 +48,7 @@ mart
 
 ### Prerequisites
 
-- Access to a Snowflake target that can read the `RAW_WIZARD.MERLINCO_APOTHECARIES` raw schema.
+- Access to a Snowflake target that can read the `RAW.SMARD` raw schema.
 - A configured dbt profile named `default`.
 - dbt Fusion / dbt Platform with dbt Wizard enabled.
 - Permission to create relations in your development target schema.
@@ -57,7 +57,7 @@ mart
 
 1. Review `dbt_project.yml` for the configured project paths and profile. The project name is currently the starter value `my_new_project`; update it if your workshop environment requires a different package name.
 2. Read the legacy implementation in `analyses/legacy_sp_load_order_profitability.sql` and the design in `analyses/legacy_sp_load_order_profitability_migration_plan.md`.
-3. Follow the guided instructions during the workshop. If you are stuck, utilize the guided prompts in `analyses/dbt_order_profitability_workshop_cheatsheet.md`.
+3. Follow the guided instructions during the workshop. If you are stuck, utilize the guided prompts in `analyses/Cheatsheet/dbt_order_profitability_workshop_cheatsheet.md`.
 4. Use `models/staging/_merlinco_sources.yml` as the documented entry point for the raw warehouse tables. These inputs are warehouse tables, so downstream models should use `source()`, not `ref()`.
 5. Build and test models incrementally as you add them, then validate the completed fact lineage:
 
