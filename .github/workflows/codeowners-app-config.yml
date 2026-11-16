@@ -25,19 +25,14 @@ jobs:
           report() {
             name="$1"; val="${2:-}"
             if [ -z "$val" ]; then
-              printf '%s: not configured\n' "$name"
+              line="$name: not configured"
             else
-              printf '%s: configured, length=%s, fingerprint=%s, prefix=%s, suffix=%s\n' \
-                "$name" "${#val}" "$(printf '%s' "$val" | sha256sum | cut -c1-16)" "${val:0:4}" "${val: -4}"
+              line="$name: configured, length=${#val}, fingerprint=$(printf '%s' "$val" | sha256sum | cut -c1-16), prefix=${val:0:4}, suffix=${val: -4}"
             fi
+            printf '%s\n' "$line"
+            printf '::notice title=codeowners-app-config::%s\n' "$line"
           }
-          {
-            echo "### CODEOWNERS app configuration"
-            echo ""
-            echo "| setting | state |"
-            echo "| --- | --- |"
-            report APP_PRIVATE_KEY "$APP_PRIVATE_KEY"
-            report APP_ID "$APP_ID"
-            report INSTALLATION_ID "$INSTALLATION_ID"
-            report LEGACY_TOKEN "$LEGACY_TOKEN"
-          } | tee -a "$GITHUB_STEP_SUMMARY"
+          report APP_PRIVATE_KEY "$APP_PRIVATE_KEY"
+          report APP_ID "$APP_ID"
+          report INSTALLATION_ID "$INSTALLATION_ID"
+          report LEGACY_TOKEN "$LEGACY_TOKEN"
