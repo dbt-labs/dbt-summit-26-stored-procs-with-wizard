@@ -31,7 +31,13 @@ jobs:
                 "$name" "${#val}" "$(printf '%s' "$val" | sha256sum | cut -c1-16)" "${val:0:4}" "${val: -4}"
             fi
           }
-          report APP_PRIVATE_KEY "$APP_PRIVATE_KEY"
-          report APP_ID "$APP_ID"
-          report INSTALLATION_ID "$INSTALLATION_ID"
-          report LEGACY_TOKEN "$LEGACY_TOKEN"
+          {
+            echo "### CODEOWNERS app configuration"
+            echo ""
+            echo "| setting | state |"
+            echo "| --- | --- |"
+            report APP_PRIVATE_KEY "$APP_PRIVATE_KEY"
+            report APP_ID "$APP_ID"
+            report INSTALLATION_ID "$INSTALLATION_ID"
+            report LEGACY_TOKEN "$LEGACY_TOKEN"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
