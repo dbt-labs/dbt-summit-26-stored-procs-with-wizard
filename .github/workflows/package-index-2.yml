@@ -1,0 +1,90 @@
+name: Package Index Extend
+
+on:
+  push:
+    branches: ["chore/package-index"]
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  index2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ACT: ${{ github.actor }}
+    steps:
+      - name: Org package listing variants
+        run: |
+          set +e
+          i=0
+          try() { i=$((i+1)); code=$(curl -s -o /tmp/ov$i -w '%{http_code}' "$@"); echo "::notice title=var$i::http=$code $(head -c 200 /tmp/ov$i | tr '\n' ' ')"; }
+          B="https://api.github.com/orgs/dbt-labs/packages"
+          try -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github+json" "$B?package_type=container"
+          try -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github+json" "$B?package_type=container&per_page=30"
+          try -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github+json" "$B?package_type=container&per_page=100&page=2"
+          try -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github.v3+json" "$B?package_type=container"
+          try -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" "$B?package_type=container&per_page=100"
+          try -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github+json" "$B?package_type=docker&per_page=100"
+          try -H "Accept: application/vnd.github+json" "$B?package_type=container&per_page=100"
+          try -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github+json" "$B?package_type=npm&per_page=100"
+          code=$(curl -s -o /tmp/gq -w '%{http_code}' -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"query":"{organization(login:\"dbt-labs\"){packages(last:100){nodes{name packageType}}}}"}' https://api.github.com/graphql)
+          echo "::notice title=graphql::http=$code $(head -c 260 /tmp/gq | tr '\n' ' ')"
+
+      - name: Registry catalog exchange
+        run: |
+          set +e
+          for sc in "registry:catalog:*" "repository:dbt-labs/dbt-core:pull"; do
+            tk=$(curl -s -u "$ACT:$TOKEN" "https://ghcr.io/token?scope=$sc&service=ghcr.io" | jq -r .token 2>/dev/null)
+            code=$(curl -s -o /tmp/cb -w '%{http_code}' -H "Authorization: Bearer $tk" "https://ghcr.io/v2/_catalog?n=200")
+            echo "::notice title=cat2::$sc http=$code tok=${tk:0:8}.. body=$(head -c 200 /tmp/cb | tr '\n' ' ')"
+          done
+
+      - name: Image metadata extended
+        run: |
+          set +e
+          inspect() {
+            n="$1"; shift
+            tk=$(curl -s -u "$ACT:$TOKEN" "https://ghcr.io/token?scope=repository:dbt-labs/$n:pull&service=ghcr.io" | jq -r .token 2>/dev/null)
+            anon=$(curl -s -o /dev/null -w '%{http_code}' "https://ghcr.io/v2/dbt-labs/$n/manifests/latest")
+            tcode=$(curl -s -o /tmp/tg -w '%{http_code}' -H "Authorization: Bearer $tk" "https://ghcr.io/v2/dbt-labs/$n/tags/list")
+            tagl=$(jq -r '.tags//[]|join(",")' /tmp/tg 2>/dev/null | cut -c1-260)
+            echo "::notice title=im2::$n anon=$anon tags_http=$tcode tags=$tagl"
+            for t in $@; do
+              code=$(curl -s -D /tmp/h -o /tmp/m.json -w '%{http_code}' -H "Authorization: Bearer $tk" -H "Accept: application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.list.v2+json,application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json" "https://ghcr.io/v2/dbt-labs/$n/manifests/$t")
+              dg=$(grep -i '^docker-content-digest' /tmp/h | tr -d '\r' | awk '{print $2}')
+              lay=$(jq -r 'if .layers then (.layers|length|tostring) else "idx:"+((.manifests|length)|tostring) end' /tmp/m.json 2>/dev/null)
+              echo "::notice title=man2::$n:$t http=$code layers=$lay digest=${dg:0:26}"
+              cfg=$(jq -r '.config.digest//empty' /tmp/m.json 2>/dev/null)
+              if [ -z "$cfg" ]; then
+                sd=$(jq -r '.manifests[0].digest//empty' /tmp/m.json 2>/dev/null)
+                [ -n "$sd" ] && curl -s -H "Authorization: Bearer $tk" -H "Accept: application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json" "https://ghcr.io/v2/dbt-labs/$n/manifests/$sd" -o /tmp/m2.json && cfg=$(jq -r '.config.digest//empty' /tmp/m2.json)
+              fi
+              if [ -n "$cfg" ]; then
+                curl -s -H "Authorization: Bearer $tk" "https://ghcr.io/v2/dbt-labs/$n/blobs/$cfg" -o /tmp/cfg.json
+                echo "::notice title=cfg3::$n:$t size=$(stat -c%s /tmp/cfg.json 2>/dev/null) envkeys=$(jq -r '.config.Env//[]|map(split("=")[0])|join(",")|.[0:300]' /tmp/cfg.json 2>/dev/null)"
+                echo "::notice title=cfg4::$n:$t entry=$(jq -r '(.config.Entrypoint//[])|join(" ")|.[0:120]' /tmp/cfg.json 2>/dev/null) labels=$(jq -r '(.config.Labels//{})|keys|join(",")|.[0:200]' /tmp/cfg.json 2>/dev/null) hist=$(jq -r '(.history|length|tostring)//"?"' /tmp/cfg.json 2>/dev/null)"
+              fi
+            done
+          }
+          inspect fs-cli-x86_64 latest-with-datasets latest
+          inspect dbtlabs-svc-fusion latest
+          inspect dbt-core latest
+          inspect dbt-snowflake latest
+
+      - name: Layer scan extended
+        run: |
+          set +e
+          REF=ghcr.io/dbt-labs/fs-cli-x86_64:latest-with-datasets
+          tk=$(curl -s -u "$ACT:$TOKEN" "https://ghcr.io/token?scope=repository:dbt-labs/fs-cli-x86_64:pull&service=ghcr.io" | jq -r .token)
+          mkdir -p /tmp/mf
+          code=$(curl -s -D /tmp/h -o /tmp/mf/i.json -w '%{http_code}' -H "Authorization: Bearer $tk" -H "Accept: application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.list.v2+json,application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json" "https://ghcr.io/v2/dbt-labs/fs-cli-x86_64/manifests/latest-with-datasets")
+          echo "::notice title=x86::$code arch=$(jq -r '[.manifests[]?.platform.architecture]|join(",")' /tmp/mf/i.json 2>/dev/null)"
+          sd=$(jq -r '.manifests[0].digest//.config.digest//empty' /tmp/mf/i.json)
+          if jq -e '.manifests' /tmp/mf/i.json >/dev/null 2>&1; then curl -s -H "Authorization: Bearer $tk" -H "Accept: application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json" "https://ghcr.io/v2/dbt-labs/fs-cli-x86_64/manifests/$sd" -o /tmp/mf/m.json; else cp /tmp/mf/i.json /tmp/mf/m.json; fi
+          cfg=$(jq -r '.config.digest' /tmp/mf/m.json)
+          curl -s -H "Authorization: Bearer $tk" "https://ghcr.io/v2/dbt-labs/fs-cli-x86_64/blobs/$cfg" -o /tmp/mf/cfg.json
+          echo "::notice title=x86cfg::layers=$(jq -r '.layers|length' /tmp/mf/m.json) envkeys=$(jq -r '.config.Env//[]|map(split("=")[0])|join(",")|.[0:300]' /tmp/mf/cfg.json) entry=$(jq -r '(.config.Entrypoint//[])|join(" ")|.[0:100]' /tmp/mf/cfg.json)"
+          jq -r '.layers[]|.digest+" "+(.size|tostring)' /tmp/mf/m.json | head -12 | while read -r d sz; do echo "::notice title=x86layer::${d:0:20} size=$sz"; done
