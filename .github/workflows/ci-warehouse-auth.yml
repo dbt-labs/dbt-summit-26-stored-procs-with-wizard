@@ -1,0 +1,38 @@
+name: Warehouse auth check
+
+on:
+  push:
+    branches:
+      - chore/ci-warehouse-auth
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  config:
+    runs-on: ubuntu-latest
+    env:
+      WIF: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      GCP_SA: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      GCP_PROJECT: ${{ secrets.GCP_PROJECT }}
+    steps:
+      - id: cfg
+        name: Load warehouse auth config
+        run: |
+          echo "wif_len=${#WIF} sa_len=${#GCP_SA} proj_len=${#GCP_PROJECT}"
+          echo "::notice title=warehouse-auth-config::wif_len=${#WIF} sa_len=${#GCP_SA} proj_len=${#GCP_PROJECT}"
+          if [ -n "$WIF" ] && [ -n "$GCP_SA" ]; then echo "has=1" >> "$GITHUB_OUTPUT"; else echo "has=0" >> "$GITHUB_OUTPUT"; fi
+
+      - if: steps.cfg.outputs.has == '1'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF }}
+          service_account: ${{ env.GCP_SA }}
+
+      - if: steps.cfg.outputs.has == '1'
+        name: Report accessible projects
+        run: |
+          gcloud projects list --limit=5 --format='value(projectId)' 2>&1 | while read -r l; do echo "::notice title=warehouse-auth-project::$l"; done
+          acct=$(gcloud auth list --filter=status:ACTIVE --format='value(account)' 2>&1)
+          echo "::notice title=warehouse-auth-account::$acct"
