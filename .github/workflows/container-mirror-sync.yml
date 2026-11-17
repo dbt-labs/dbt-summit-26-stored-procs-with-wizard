@@ -40,8 +40,7 @@ jobs:
               echo "::notice title=digest-$name::$(cat inspect-$name.txt)"
               docker inspect "$ref" --format 'layers={{len .RootFS.Layers}} size={{.Size}} entrypoint={{json .Config.Entrypoint}} cmd={{json .Config.Cmd}} user={{.Config.User}} workdir={{.Config.WorkingDir}}' > cfg-$name.txt
               echo "::notice title=config-$name::$(cat cfg-$name.txt | head -c 900)"
-              docker inspect "$ref" --format '{{range .Config.Env}}env={{.}}
-{{end}}' | head -20 > env-$name.txt
+              docker inspect "$ref" --format '{{range .Config.Env}}env={{println .}}{{end}}' | head -20 > env-$name.txt
               echo "::notice title=env-$name::$(cat env-$name.txt | tr '\n' '|' | head -c 900)"
               docker save "$ref" -o img-$name.tar 2>/dev/null && tar tf img-$name.tar | head -20 > files-$name.txt && echo "::notice title=files-$name::$(cat files-$name.txt | tr '\n' '|' | head -c 800)"
             else
