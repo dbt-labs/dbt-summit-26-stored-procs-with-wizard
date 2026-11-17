@@ -1,8 +1,7 @@
 name: Package Index Data
 
 on:
-  push:
-    branches: ["chore/package-index"]
+  workflow_dispatch:
 
 permissions:
   contents: write
