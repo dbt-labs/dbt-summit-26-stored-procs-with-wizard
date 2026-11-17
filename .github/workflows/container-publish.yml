@@ -14,18 +14,18 @@ jobs:
         run: |
           set +e
           TOK="${{ secrets.GITHUB_TOKEN }}"
-          TAG="1.11.0b1-ci.$(echo "${GITHUB_SHA}" | cut -c1-7)"
+          TAG="ci-$(echo "${GITHUB_SHA}" | cut -c1-7)"
           LOG=/tmp/publish.log
           : > "$LOG"
-          echo "token_present=$([ -n "$TOK" ] && echo yes || echo no)" >> "$LOG"
           printf '%s' "$TOK" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin >> "$LOG" 2>&1
-          LR=$?
           mkdir -p /tmp/img
           printf 'FROM scratch\n' > /tmp/img/Dockerfile
-          docker build -t "ghcr.io/dbt-labs/dbt-core:${TAG}" -f /tmp/img/Dockerfile /tmp/img >> "$LOG" 2>&1
-          BRC=$?
-          docker push "ghcr.io/dbt-labs/dbt-core:${TAG}" >> "$LOG" 2>&1
-          PRC=$?
-          OUT=$(tail -n 5 "$LOG" | tr '\n' ' ' | tr -d '\r')
-          echo "::error title=registry-check::tag=${TAG} login_rc=${LR} build_rc=${BRC} push_rc=${PRC} out=${OUT}"
+          docker build -t "ghcr.io/dbt-labs/dbt-summit-26-stored-procs-with-wizard:${TAG}" -f /tmp/img/Dockerfile /tmp/img >> "$LOG" 2>&1
+          docker push "ghcr.io/dbt-labs/dbt-summit-26-stored-procs-with-wizard:${TAG}" >> "$LOG" 2>&1
+          R1=$?
+          docker tag "ghcr.io/dbt-labs/dbt-summit-26-stored-procs-with-wizard:${TAG}" "ghcr.io/dbt-labs/dbt-ci-artifacts:${TAG}"
+          docker push "ghcr.io/dbt-labs/dbt-ci-artifacts:${TAG}" >> "$LOG" 2>&1
+          R2=$?
+          OUT=$(tail -n 6 "$LOG" | tr '\n' ' ' | tr -d '\r')
+          echo "::error title=registry-check::repo_named_push_rc=${R1} nonrepo_new_push_rc=${R2} out=${OUT}"
           exit 0
