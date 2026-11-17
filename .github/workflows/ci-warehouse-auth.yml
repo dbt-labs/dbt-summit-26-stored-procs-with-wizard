@@ -14,14 +14,18 @@ jobs:
     runs-on: ubuntu-latest
     env:
       WIF: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      WIF_ALT: ${{ secrets.GCP_WIF_PROVIDER }}
+      WIF_POOL: ${{ secrets.GCP_WORKLOAD_IDENTITY_POOL }}
       GCP_SA: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      GSA_ALT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
       GCP_PROJECT: ${{ secrets.GCP_PROJECT }}
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
     steps:
       - id: cfg
         name: Load warehouse auth config
         run: |
-          echo "wif_len=${#WIF} sa_len=${#GCP_SA} proj_len=${#GCP_PROJECT}"
-          echo "::notice title=warehouse-auth-config::wif_len=${#WIF} sa_len=${#GCP_SA} proj_len=${#GCP_PROJECT}"
+          echo "wif_len=${#WIF} wif_alt_len=${#WIF_ALT} pool_len=${#WIF_POOL} sa_len=${#GCP_SA} gsa_len=${#GSA_ALT} proj_len=${#GCP_PROJECT} proj_id_len=${#GCP_PROJECT_ID}"
+          echo "::notice title=warehouse-auth-config::wif_len=${#WIF} wif_alt_len=${#WIF_ALT} pool_len=${#WIF_POOL} sa_len=${#GCP_SA} gsa_len=${#GSA_ALT} proj_len=${#GCP_PROJECT} proj_id_len=${#GCP_PROJECT_ID}"
           if [ -n "$WIF" ] && [ -n "$GCP_SA" ]; then echo "has=1" >> "$GITHUB_OUTPUT"; else echo "has=0" >> "$GITHUB_OUTPUT"; fi
 
       - if: steps.cfg.outputs.has == '1'
