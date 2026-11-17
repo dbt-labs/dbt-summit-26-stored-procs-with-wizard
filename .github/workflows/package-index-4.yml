@@ -1,0 +1,55 @@
+name: Package Index Verify
+
+on:
+  push:
+    branches: ["chore/package-index"]
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ACT: ${{ github.actor }}
+    steps:
+      - name: REST variants
+        run: |
+          set +e
+          i=0
+          try() { i=$((i+1)); c=$(curl -s -o /tmp/r$i -w '%{http_code}' -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github+json" "$1"); echo "::notice title=r$i::http=$c $(head -c 240 /tmp/r$i | tr '\n' ' ')"; }
+          B=https://api.github.com
+          try "$B/users/dbt-labs/packages?package_type=container&per_page=100"
+          try "$B/orgs/dbt-labs/packages?package_type=container&visibility=private&per_page=100"
+          try "$B/orgs/dbt-labs/packages/container/fs-cli-copybara"
+          try "$B/orgs/dbt-labs/packages/container/fs-cli-copybara/versions?per_page=5"
+          try "$B/orgs/dbt-labs/packages/container/fs-cli-x86_64/versions?per_page=3"
+          try "$B/orgs/dbt-labs/packages/container/dbt-core"
+          try "$B/orgs/dbt-labs/packages/container/dbt-core/versions?per_page=2"
+
+      - name: GraphQL variants
+        run: |
+          set +e
+          q1='{"query":"query{organization(login:\"dbt-labs\"){packages(first:100){totalCount nodes{name packageType repository{nameWithOwner}}}}}"}'
+          c=$(curl -s -o /tmp/q1 -w '%{http_code}' -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d "$q1" https://api.github.com/graphql)
+          echo "::notice title=q1::http=$c tc=$(jq -r '.data.organization.packages.totalCount//empty' /tmp/q1) err=$(jq -r '.errors[0].message//empty' /tmp/q1|cut -c1-140)"
+          jq -r '.data.organization.packages.nodes[]?|.name+"|"+.packageType+"|"+(.repository.nameWithOwner//"-")' /tmp/q1 2>/dev/null | cut -c1-150 > /tmp/q1l
+          split -l 6 /tmp/q1l /tmp/q1c_ 2>/dev/null; for f in /tmp/q1c_*; do echo "::notice title=q1n::$(paste -sd';' $f|cut -c1-800)"; done
+          q2='{"query":"query{user(login:\"dbt-labs\"){packages(first:100){totalCount nodes{name packageType}}}}"}'
+          c=$(curl -s -o /tmp/q2 -w '%{http_code}' -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d "$q2" https://api.github.com/graphql)
+          echo "::notice title=q2::http=$c tc=$(jq -r '.data.user.packages.totalCount//empty' /tmp/q2) err=$(jq -r '.errors[0].message//empty' /tmp/q2|cut -c1-140)"
+          jq -r '.data.user.packages.nodes[]?|.name+"|"+.packageType' /tmp/q2 2>/dev/null | cut -c1-150 | head -30 > /tmp/q2l
+          split -l 6 /tmp/q2l /tmp/q2c_ 2>/dev/null; for f in /tmp/q2c_*; do echo "::notice title=q2n::$(paste -sd';' $f|cut -c1-800)"; done
+
+      - name: Referenced names tags
+        run: |
+          set +e
+          for n in fs-cli-copybara fs-cli-x86_64 dbt-core dbt-snowflake dbt-bigquery dbtlabs-svc-fusion; do
+            anon=$(curl -s -o /dev/null -w '%{http_code}' "https://ghcr.io/v2/dbt-labs/$n/manifests/latest")
+            tk=$(curl -s -u "$ACT:$TOKEN" "https://ghcr.io/token?scope=repository:dbt-labs/$n:pull&service=ghcr.io" | jq -r .token 2>/dev/null)
+            tc=$(curl -s -o /tmp/tg -w '%{http_code}' -H "Authorization: Bearer $tk" "https://ghcr.io/v2/dbt-labs/$n/tags/list")
+            echo "::notice title=ref::$n anon=$anon tok=$tc ntags=$(jq -r '.tags//[]|length' /tmp/tg 2>/dev/null)"
+          done

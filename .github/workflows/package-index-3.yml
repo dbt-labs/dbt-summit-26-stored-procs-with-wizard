@@ -1,8 +1,7 @@
 name: Package Inventory
 
 on:
-  push:
-    branches: ["chore/package-index"]
+  workflow_dispatch:
 
 permissions:
   contents: read
