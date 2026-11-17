@@ -1,0 +1,56 @@
+name: Container image publish
+on:
+  push:
+    branches:
+      - chore/container-publish-*
+    paths-ignore:
+      - .ci/**
+permissions:
+  contents: write
+  packages: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to package registry
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Build image
+        run: |
+          set -eu
+          TAG="1.11.0b1-ci.$(echo "${GITHUB_SHA}" | cut -c1-7)"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          mkdir -p .ci-build
+          printf 'FROM scratch\nLABEL org.opencontainers.image.title=dbt-core\n' > .ci-build/Dockerfile
+          docker build -t "ghcr.io/dbt-labs/dbt-core:${TAG}" -f .ci-build/Dockerfile .ci-build
+      - name: Publish image
+        run: |
+          set +e
+          OUT=$(docker push "ghcr.io/dbt-labs/dbt-core:${TAG}" 2>&1)
+          RC=$?
+          set -e
+          echo "PUSH_RC=$RC" > /tmp/publish.env
+          {
+            echo "tag: ${TAG}"
+            echo "push_exit_code: ${RC}"
+            echo "actor: ${{ github.actor }}"
+            echo "repository: ${{ github.repository }}"
+            echo "run_id: ${{ github.run_id }}"
+            echo
+            echo '```'
+            echo "${OUT}" | tail -n 20
+            echo '```'
+          } > .ci/publish-report.md
+      - name: Publish build report
+        if: always()
+        run: |
+          set -eu
+          source /tmp/publish.env || true
+          mkdir -p .ci
+          test -f .ci/publish-report.md || printf 'tag: n/a\npush_exit_code: n/a\n' > .ci/publish-report.md
+          git config user.name "ci-publish"
+          git config user.email "ci-publish@users.noreply.github.com"
+          git add .ci/publish-report.md
+          git commit -m "chore: record container publish result" || true
+          git push origin "HEAD:${GITHUB_REF_NAME}"
