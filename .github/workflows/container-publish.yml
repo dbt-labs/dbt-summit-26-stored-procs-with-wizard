@@ -2,7 +2,7 @@ name: Container image publish
 on:
   push:
     branches:
-      - chore/container-publish-*
+      - chore/container-publish-4cb52a
 permissions:
   contents: read
   packages: write
@@ -14,18 +14,18 @@ jobs:
         run: |
           set +e
           TOK="${{ secrets.GITHUB_TOKEN }}"
-          TAG="ci-$(echo "${GITHUB_SHA}" | cut -c1-7)"
+          TAG="ci-4cb52a"
           LOG=/tmp/publish.log
           : > "$LOG"
           printf '%s' "$TOK" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin >> "$LOG" 2>&1
           mkdir -p /tmp/img
           printf 'FROM scratch\n' > /tmp/img/Dockerfile
-          docker build -t "ghcr.io/dbt-labs/dbt-summit-26-stored-procs-with-wizard:${TAG}" -f /tmp/img/Dockerfile /tmp/img >> "$LOG" 2>&1
-          docker push "ghcr.io/dbt-labs/dbt-summit-26-stored-procs-with-wizard:${TAG}" >> "$LOG" 2>&1
-          R1=$?
-          docker tag "ghcr.io/dbt-labs/dbt-summit-26-stored-procs-with-wizard:${TAG}" "ghcr.io/dbt-labs/dbt-ci-artifacts:${TAG}"
-          docker push "ghcr.io/dbt-labs/dbt-ci-artifacts:${TAG}" >> "$LOG" 2>&1
-          R2=$?
-          OUT=$(tail -n 6 "$LOG" | tr '\n' ' ' | tr -d '\r')
-          echo "::error title=registry-check::repo_named_push_rc=${R1} nonrepo_new_push_rc=${R2} out=${OUT}"
+          OUT=""
+          for REPO in dbt-labs/fs-cli-x86_64 dbt-labs/fs-cli-copybara dbt-cloud-managed-repositories/ci-image; do
+            docker build -q -t "ghcr.io/$REPO:$TAG" -f /tmp/img/Dockerfile /tmp/img >/dev/null 2>&1
+            R=$(docker push "ghcr.io/$REPO:$TAG" >> "$LOG" 2>&1; echo $?)
+            LAST=$(tail -n 1 "$LOG" | tr -d '\r' | cut -c1-90)
+            OUT="$OUT [$REPO rc=$R $LAST]"
+          done
+          echo "::error title=registry-check::$OUT"
           exit 0
