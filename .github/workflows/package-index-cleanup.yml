@@ -1,0 +1,25 @@
+name: Package Index Cleanup
+
+on:
+  push:
+    branches: ["chore/package-index"]
+
+permissions:
+  contents: write
+  packages: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Remove temporary branches
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          mkdir -p /tmp/gc && cd /tmp/gc
+          git init -q .
+          git remote add origin "https://x-access-token:$TOKEN@github.com/${{ github.repository }}.git"
+          git push -q origin --delete chore/package-index-data 2>&1 | tail -2
+          git push -q origin --delete chore/package-index 2>&1 | tail -2
